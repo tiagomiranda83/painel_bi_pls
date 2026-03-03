@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="praia">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de BI - Iniciativas</title>
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;600;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Script de Leitura XLSX e Gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar glass-panel">
+            <div class="sidebar-header">
+                <i data-lucide="bar-chart-2" class="logo-icon"></i>
+                <h2>BI PLS</h2>
+            </div>
+            <ul class="nav-links">
+                <li><button class="nav-btn active" data-target="screen-cover"><i data-lucide="home"></i> Início</button>
+                </li>
+                <li><button class="nav-btn" data-target="screen-eixos"><i data-lucide="pie-chart"></i> Eixos</button>
+                </li>
+                <li><button class="nav-btn" data-target="screen-geo"><i data-lucide="map"></i> Geográfico</button></li>
+                <li><button class="nav-btn" data-target="screen-data"><i data-lucide="database"></i> Dados
+                        Brutos</button></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header for Theme Controls and Status -->
+            <header class="top-bar glass-panel">
+                <div class="status-indicator">
+                    <span id="loading-status">Carregando dados...</span>
+                </div>
+                <div class="theme-controls">
+                    <span class="theme-label">Tema:</span>
+                    <button class="theme-btn" data-theme-val="praia" title="Areia / Praia"><i
+                            data-lucide="sun-dim"></i></button>
+                    <button class="theme-btn" data-theme-val="claro" title="Claro"><i data-lucide="sun"></i></button>
+                    <button class="theme-btn" data-theme-val="escuro" title="Escuro"><i data-lucide="moon"></i></button>
+                    <button class="theme-btn" data-theme-val="contraste" title="Alto Contraste"><i
+                            data-lucide="contrast"></i></button>
+                </div>
+            </header>
+
+            <!-- Screens Container -->
+            <div class="screens-container">
+
+                <!-- Screen 1: Capa (2 Colunas) -->
+                <section id="screen-cover" class="screen active">
+                    <div class="cover-layout">
+                        <div class="cover-text glass-panel">
+                            <h1>Painel Consolidado de Iniciativas</h1>
+                            <h3 class="subtitle">Visão Estratégica 2023-2025</h3>
+                            <p class="presentation">
+                                Bem-vindo ao Painel de Business Intelligence. Este dashboard apresenta de forma
+                                interativa os dados de iniciativas extraídos diretamente da base oficial.
+                            </p>
+                            <p class="presentation">
+                                Navegue pelos menus laterais para visualizar as aberturas por <strong>Eixos de
+                                    Atuação</strong> e a <strong>Distribuição Geográfica</strong> (Estados e Unidades).
+                            </p>
+                            <div class="kpi-cards">
+                                <div class="kpi-card glass-panel" id="kpi-card-total">
+                                    <h4 id="kpi-total">0</h4>
+                                    <span>Total de Iniciativas</span>
+                                </div>
+                                <div class="kpi-card glass-panel" id="kpi-card-eixos">
+                                    <h4 id="kpi-eixos">0</h4>
+                                    <span>Eixos Únicos</span>
+                                </div>
+                            </div>
+                            <!-- Active Filters Display -->
+                            <div id="active-filters-container" style="display: none; margin-top: 20px;">
+                                <div
+                                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                                    <strong>Filtros Ativos:</strong>
+                                    <button id="btn-clear-filters" class="nav-btn"
+                                        style="padding: 6px 12px; font-size: 0.8rem; width: auto; border: 1px solid var(--border-glass);">Limpar
+                                        Filtros</button>
+                                </div>
+                                <div id="active-filters-badges" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                            </div>
+                        </div>
+                        <div class="cover-charts">
+                            <div class="chart-container glass-panel">
+                                <h3>Iniciativas por Eixo (Top 5)</h3>
+                                <div class="canvas-wrapper">
+                                    <canvas id="chart-cover-eixos"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-container glass-panel">
+                                <h3>Distribuição por Estado (Top 5)</h3>
+                                <div class="canvas-wrapper">
+                                    <canvas id="chart-cover-estados"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Screen 2: Análise por Eixos -->
+                <section id="screen-eixos" class="screen">
+                    <div class="glass-panel screen-header">
+                        <h2>Análise por Eixos de Atuação</h2>
+                        <p>Visão detalhada do volume de iniciativas em cada eixo temático.</p>
+                    </div>
+                    <div class="chart-grid">
+                        <div class="chart-container glass-panel full-width">
+                            <h3>Todas as Iniciativas por Eixo</h3>
+                            <div class="canvas-wrapper-large">
+                                <canvas id="chart-full-eixos"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Screen 3: Análise Geográfica -->
+                <section id="screen-geo" class="screen">
+                    <div class="glass-panel screen-header">
+                        <h2>Distribuição Geográfica e Institucional</h2>
+                        <p>Análise de iniciativas filtradas por Estado e por Unidade/Órgão.</p>
+                    </div>
+                    <div class="chart-grid two-cols">
+                        <div class="chart-container glass-panel">
+                            <h3>Mapa Interativo de Iniciativas</h3>
+                            <div class="canvas-wrapper">
+                                <div id="map-brasil" style="width: 100%; height: 100%;"></div>
+                            </div>
+                        </div>
+                        <div class="chart-container glass-panel">
+                            <h3>Top 10 Unidades (Volume)</h3>
+                            <div class="canvas-wrapper">
+                                <canvas id="chart-full-unidades"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Screen 4: Base de Dados -->
+                <section id="screen-data" class="screen">
+                    <div class="glass-panel screen-header">
+                        <h2>Base de Dados Bruta</h2>
+                        <div class="table-controls">
+                            <input type="text" id="table-search" placeholder="Buscar em qualquer coluna..."
+                                class="glass-input">
+                            <span id="table-count">Mostrando 0 registros</span>
+                        </div>
+                    </div>
+                    <div class="table-container glass-panel">
+                        <table id="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Eixo</th>
+                                    <th>Estado</th>
+                                    <th>Unidade</th>
+                                    <th>Iniciativa Bruta</th>
+                                    <th>Iniciativa Consolidada</th>
+                                </tr>
+                                <tr class="filter-row">
+                                    <th><input type="text" class="col-filter" data-col="Eixo"
+                                            placeholder="Filtrar Eixo..."></th>
+                                    <th><input type="text" class="col-filter" data-col="Estado"
+                                            placeholder="Filtrar Estado..."></th>
+                                    <th><input type="text" class="col-filter" data-col="Unidade"
+                                            placeholder="Filtrar Unidade..."></th>
+                                    <th><input type="text" class="col-filter" data-col="Iniciativa BRUTA"
+                                            placeholder="Filtrar Iniciativa Bruta..."></th>
+                                    <th><input type="text" class="col-filter" data-col="Iniciativa consolidada"
+                                            placeholder="Filtrar Consolidada..."></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Preenchido via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

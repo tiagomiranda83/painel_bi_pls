@@ -18,6 +18,7 @@
     <!-- Script de Leitura XLSX e Gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud/dist/echarts-wordcloud.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 
@@ -127,6 +128,12 @@
                                 <canvas id="chart-full-eixos"></canvas>
                             </div>
                         </div>
+                        <div class="chart-container glass-panel full-width">
+                            <h3>Nuvem de Palavras (Termos Frequentes nas Iniciativas)</h3>
+                            <div class="canvas-wrapper-large">
+                                <div id="chart-wordcloud" style="width: 100%; height: 100%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -136,10 +143,10 @@
                         <h2>Distribuição Geográfica e Institucional</h2>
                         <p>Análise de iniciativas filtradas por Estado e por Unidade/Órgão.</p>
                     </div>
-                    <div class="chart-grid two-cols">
+                    <div class="chart-grid geo-cols">
                         <div class="chart-container glass-panel">
                             <h3>Mapa Interativo de Iniciativas</h3>
-                            <div class="canvas-wrapper">
+                            <div class="canvas-wrapper-xl">
                                 <div id="map-brasil" style="width: 100%; height: 100%;"></div>
                             </div>
                         </div>

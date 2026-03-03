@@ -401,6 +401,10 @@ h6 {
     grid-template-columns: 1fr 1fr;
 }
 
+.chart-grid.geo-cols {
+    grid-template-columns: 2fr 1fr;
+}
+
 .canvas-wrapper {
     position: relative;
     flex: 1;
@@ -409,6 +413,12 @@ h6 {
 
 .canvas-wrapper-large {
     height: 500px;
+    position: relative;
+    width: 100%;
+}
+
+.canvas-wrapper-xl {
+    height: 650px;
     position: relative;
     width: 100%;
 }
@@ -519,7 +529,8 @@ tbody tr:hover {
         flex-direction: column;
     }
 
-    .chart-grid.two-cols {
+    .chart-grid.two-cols,
+    .chart-grid.geo-cols {
         grid-template-columns: 1fr;
     }
 }

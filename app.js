@@ -274,11 +274,82 @@ function processAndRender() {
     createOrUpdateChart('chart-full-eixos', 'bar', countEixos.map(x => x[0]), countEixos.map(x => x[1]), 'fullEixos', 'Eixo', horizontalBarOptions);
     createOrUpdateChart('chart-full-unidades', 'bar', countUnidades.slice(0, 10).map(x => x[0]), countUnidades.slice(0, 10).map(x => x[1]), 'fullUnidades', 'Unidade', barOptions);
 
-    // Map ECharts
+    // Extra charts Map / WordCloud
     renderMap(countEstados);
+    renderWordCloud(data);
 
     // Table
     renderTable();
+}
+
+let wordCloudChart = null;
+
+function renderWordCloud(data) {
+    if (!wordCloudChart) {
+        let el = document.getElementById('chart-wordcloud');
+        if (!el) return;
+        wordCloudChart = echarts.init(el);
+        window.addEventListener('resize', () => {
+            if (wordCloudChart) wordCloudChart.resize();
+        });
+        wordCloudChart.on('click', function (params) {
+            const term = params.name;
+            // Cross table filtering (free text) by clicking on word cloud!
+            GlobalState.setTableFilter('Iniciativa BRUTA', term);
+            GlobalState.setTableFilter('Iniciativa consolidada', term);
+            // switch screen to data to see the results
+            navBtns.forEach(b => {
+                if (b.getAttribute('data-target') === 'screen-data') b.click();
+            });
+
+            // flash the search box
+            document.getElementById('table-search').value = term;
+            GlobalState.getTableFilteredData(data); // force re-filter via global term manually since UI was bypassed
+            renderTable();
+        });
+    }
+
+    const stopWords = ['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'uma', 'os', 'no', 'se', 'na', 'por', 'mais', 'as', 'dos', 'como', 'mas', 'foi', 'ao', 'ele', 'das', 'tem', 'à', 'seu', 'sua', 'ou', 'ser', 'quando', 'muito', 'há', 'nos', 'já', 'está', 'eu', 'também', 'só', 'pelo', 'pela', 'até', 'isso', 'ela', 'entre', 'era', 'depois', 'sem', 'mesmo', 'aos', 'ter', 'seus', 'quem', 'nas', 'me', 'esse', 'eles', 'estão', 'você', 'tinha', 'foram', 'essa', 'num', 'nem', 'suas', 'meu', 'às', 'minha', 'têm', 'numa', 'pelos', 'elas', 'havia', 'seja', 'qual', 'será', 'nós', 'tenho', 'lhe', 'deles', 'essas', 'esses', 'pelas', 'este', 'fosse', 'dele', 'tu', 'te', 'vocês', 'vos', 'lhes', 'meus', 'minhas', 'teu', 'tua', 'teus', 'tuas', 'nosso', 'nossa', 'nossos', 'nossas', 'dela', 'delas', 'esta', 'estes', 'estas', 'aquele', 'aquela', 'aqueles', 'aquelas', 'isto', 'aquilo', 'estou', 'estamos', 'estive', 'esteve', 'estivemos', 'estiveram', 'estava', 'estávamos', 'estavam', 'estivera', 'estivéramos', 'esteja', 'estejamos', 'estejam', 'estivesse', 'estivéssemos', 'estivessem', 'estiver', 'estivermos', 'estiverem', 'hei', 'há', 'havemos', 'hão', 'houve', 'houvemos', 'houveram', 'houvera', 'houvéramos', 'haja', 'hajamos', 'hajam', 'houvesse', 'houvéssemos', 'houvessem', 'houver', 'houvermos', 'houverem', 'houverei', 'houverá', 'houveremos', 'houverão', 'houveria', 'houveríamos', 'houveriam', 'sou', 'somos', 'são', 'era', 'éramos', 'eram', 'fui', 'foi', 'fomos', 'foram', 'fora', 'fôramos', 'seja', 'sejamos', 'sejam', 'fosse', 'fôssemos', 'fossem', 'for', 'formos', 'forem', 'serei', 'será', 'seremos', 'serão', 'seria', 'seríamos', 'seriam', 'tenho', 'tem', 'temos', 'tém', 'tinha', 'tínhamos', 'tinham', 'tive', 'teve', 'tivemos', 'tiveram', 'tivera', 'tivéramos', 'tenha', 'tenhamos', 'tenham', 'tivesse', 'tivéssemos', 'tivessem', 'tiver', 'tivermos', 'tiverem', 'terei', 'terá', 'teremos', 'terão', 'teria', 'teríamos', 'teriam'];
+    const wordCounts = {};
+
+    data.forEach(row => {
+        const text = (row['Iniciativa BRUTA'] || '') + " " + (row['Iniciativa consolidada'] || '');
+        const words = text.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "").split(/\s+/);
+
+        words.forEach(word => {
+            if (word.length > 3 && !stopWords.includes(word)) {
+                wordCounts[word] = (wordCounts[word] || 0) + 1;
+            }
+        });
+    });
+
+    // top 80 words
+    const topWords = Object.entries(wordCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 80)
+        .map(w => ({ name: w[0], value: w[1] }));
+
+    wordCloudChart.setOption({
+        tooltip: { show: true },
+        series: [{
+            type: 'wordCloud',
+            shape: 'circle',
+            keepAspect: true,
+            left: 'center', top: 'center', width: '90%', height: '90%',
+            sizeRange: [12, 60],
+            rotationRange: [-45, 45],
+            gridSize: 8,
+            textStyle: {
+                fontFamily: getCssVar('--font-heading'),
+                fontWeight: 'bold',
+                color: function () {
+                    const colors = [getCssVar('--chart-color-1'), getCssVar('--chart-color-2'), getCssVar('--chart-color-3'), getCssVar('--chart-color-4'), getCssVar('--text-muted')];
+                    return colors[Math.floor(Math.random() * colors.length)];
+                }
+            },
+            data: topWords
+        }]
+    });
 }
 
 function updateMapColors() {
@@ -316,7 +387,8 @@ function renderMap(countEstados) {
         },
         series: [{
             name: 'Iniciativas', type: 'map', map: 'BR', roam: true,
-            zoom: 1.2,
+            aspectScale: 0.9,
+            zoom: 1.1,
             itemStyle: { borderColor: getCssVar('--bg-main'), areaColor: 'rgba(128,128,128,0.1)' },
             emphasis: { itemStyle: { areaColor: getCssVar('--accent-hover') }, label: { show: true, color: '#fff' } },
             data: mapData

@@ -285,6 +285,10 @@ function updateAllChartsColors() {
         }
         chart.update();
     }
+    // Update ECharts
+    if (mapChart) updateMapColors();
+    if (wordCloudChart) renderWordCloud(GlobalState.getFilteredData());
+    if (charts.heatmap) renderHeatmap(GlobalState.getFilteredData());
 }
 
 function createOrUpdateChart(canvasId, type, labels, data, chartKey, filterField, axisConf = {}) {
@@ -311,7 +315,7 @@ function createOrUpdateChart(canvasId, type, labels, data, chartKey, filterField
             datasets: (typeof data[0] === 'object' && data[0] !== null) ? data : [{ 
                 label: 'Iniciativas',
                 data: data, 
-                backgroundColor: colors, 
+                backgroundColor: axisConf.customDatasetColors || colors, 
                 borderWidth: 1, 
                 borderColor: getCssVar('--bg-main'), 
                 borderRadius: type === 'bar' ? 4 : 0 
@@ -336,7 +340,7 @@ function createOrUpdateChart(canvasId, type, labels, data, chartKey, filterField
             onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
             plugins: {
                 legend: { 
-                    display: (type === 'pie' || type === 'doughnut' || (Array.isArray(data[0]) && typeof data[0] === 'object')), 
+                    display: false, // Legenda agora é permanente na sidebar direita
                     position: 'bottom', 
                     labels: { color: getCssVar('--text-main'), font: { family: getCssVar('--font-body'), size: 10 }, boxWidth: 12 } 
                 },
@@ -400,13 +404,18 @@ function processAndRender() {
             x: { stacked: true, ticks: { color: getCssVar('--text-muted') }, grid: { color: getCssVar('--border-glass') } },
             y: { stacked: true, ticks: { color: getCssVar('--text-muted') }, grid: { color: getCssVar('--border-glass') } }
         },
-        plugins: { legend: { display: true } }
+        plugins: { legend: { display: false } }
     };
     const horizontalBarOptions = { indexAxis: 'y', scales: barOptions.scales, plugins: barOptions.plugins };
 
+    const barEixosColors = countEixos.map(x => GlobalState.customColors[x[0]] || getCssVar('--accent'));
+
     createOrUpdateChart('chart-cover-eixos', 'doughnut', countEixos.slice(0, 5).map(x => x[0]), countEixos.slice(0, 5).map(x => x[1]), 'coverEixos', 'Eixo');
     createOrUpdateChart('chart-cover-estados', 'bar', top5States, stackedData, 'coverEstados', 'Estado', barOptions);
-    createOrUpdateChart('chart-full-eixos', 'bar', countEixos.map(x => x[0]), countEixos.map(x => x[1]), 'fullEixos', 'Eixo', horizontalBarOptions);
+    createOrUpdateChart('chart-full-eixos', 'bar', countEixos.map(x => x[0]), countEixos.map(x => x[1]), 'fullEixos', 'Eixo', { 
+        ...horizontalBarOptions,
+        customDatasetColors: barEixosColors
+    });
     createOrUpdateChart('chart-full-unidades', 'bar', countUnidades.slice(0, 10).map(x => x[0]), countUnidades.slice(0, 10).map(x => x[1]), 'fullUnidades', 'Unidade', horizontalBarOptions);
 
     renderMap(countEstados);
@@ -433,6 +442,9 @@ function renderInsights(data) {
 
 function renderPareto(data) {
     const counts = countBy(data, 'Órgão');
+    // Garantir ordenação decrescente para o Pareto
+    counts.sort((a, b) => b[1] - a[1]);
+    
     const labels = counts.map(x => x[0]);
     const values = counts.map(x => x[1]);
     const total = values.reduce((a, b) => a + b, 0);
@@ -445,7 +457,7 @@ function renderPareto(data) {
 
     const dataset = [
         {
-            label: 'Iniciativas',
+            label: 'Volume por Órgão',
             data: values,
             backgroundColor: getCssVar('--accent'),
             borderRadius: 6,
@@ -458,20 +470,27 @@ function renderPareto(data) {
             borderColor: '#ff6b6b',
             backgroundColor: '#ff6b6b',
             borderWidth: 3,
-            pointRadius: 4,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            tension: 0.1, // Curva suave
             yAxisID: 'y1'
         }
     ];
 
     const options = {
         scales: {
-            y: { title: { display: true, text: 'Qtd Iniciativas' }, grid: { color: getCssVar('--border-glass') } },
+            y: { 
+                beginAtZero: true,
+                title: { display: true, text: 'Qtd Iniciativas' }, 
+                grid: { color: getCssVar('--border-glass') } 
+            },
             y1: { 
                 position: 'right', 
                 min: 0, 
                 max: 100, 
                 title: { display: true, text: '% Acumulada' },
-                grid: { drawOnChartArea: false }
+                grid: { drawOnChartArea: false },
+                ticks: { callback: value => value + '%' }
             }
         }
     };
@@ -502,7 +521,17 @@ function renderHeatmap(data) {
     const option = {
         tooltip: { position: 'top' },
         grid: { height: '70%', top: '15%', left: '15%' },
-        xAxis: { type: 'category', data: eixos, splitArea: { show: true }, axisLabel: { interval: 0, rotate: 30 } },
+        xAxis: { 
+            type: 'category', 
+            data: eixos, 
+            splitArea: { show: true }, 
+            axisLabel: { 
+                interval: 0, 
+                rotate: 30,
+                color: (val) => GlobalState.customColors[val] || getCssVar('--text-main'),
+                fontWeight: 'bold'
+            } 
+        },
         yAxis: { type: 'category', data: orgaos, splitArea: { show: true } },
         visualMap: {
             min: 0,
@@ -511,7 +540,7 @@ function renderHeatmap(data) {
             orient: 'horizontal',
             left: 'center',
             bottom: '0%',
-            inRange: { color: [getCssVar('--chart-color-4'), getCssVar('--accent')] }
+            inRange: { color: [getCssVar('--bg-main'), getCssVar('--accent')] }
         },
         series: [{
             name: 'Volume',
@@ -622,11 +651,16 @@ function renderWordCloud(data) {
         tooltip: { show: true },
         series: [{
             type: 'wordCloud', shape: 'circle', keepAspect: true, width: '100%', height: '100%',
-            sizeRange: [8, 50], rotationRange: [-90, 90], gridSize: 2, drawOutOfBound: true,
-            textStyle: { fontFamily: getCssVar('--font-heading'), fontWeight: 'bold', color: () => {
-                const colors = getThemeColors();
-                return colors[Math.floor(Math.random() * colors.length)];
-            }},
+            sizeRange: [10, 60], rotationRange: [-90, 90], gridSize: 4, drawOutOfBound: true,
+            textStyle: { 
+                fontFamily: getCssVar('--font-heading'), 
+                fontWeight: 'bold', 
+                color: () => {
+                    if (GlobalState.filters['Eixo']) return GlobalState.customColors[GlobalState.filters['Eixo']];
+                    const colors = Object.values(GlobalState.customColors);
+                    return colors.length ? colors[Math.floor(Math.random() * colors.length)] : getCssVar('--accent');
+                }
+            },
             data: topWords
         }]
     });

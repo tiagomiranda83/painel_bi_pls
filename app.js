@@ -422,8 +422,11 @@ function processAndRender() {
     const horizontalBarOptions = { indexAxis: 'y', scales: barOptions.scales, plugins: barOptions.plugins };
 
     const barEixosColors = countEixos.map(x => GlobalState.customColors[x[0]] || getCssVar('--accent'));
+    const doughnutEixosColors = countEixos.slice(0, 5).map(x => GlobalState.customColors[x[0]] || getCssVar('--accent'));
 
-    createOrUpdateChart('chart-cover-eixos', 'doughnut', countEixos.slice(0, 5).map(x => x[0]), countEixos.slice(0, 5).map(x => x[1]), 'coverEixos', 'Eixo');
+    createOrUpdateChart('chart-cover-eixos', 'doughnut', countEixos.slice(0, 5).map(x => x[0]), countEixos.slice(0, 5).map(x => x[1]), 'coverEixos', 'Eixo', {
+        customDatasetColors: doughnutEixosColors
+    });
     createOrUpdateChart('chart-cover-estados', 'bar', top5States, stackedData, 'coverEstados', 'Estado', barOptions);
     createOrUpdateChart('chart-full-eixos', 'bar', countEixos.map(x => x[0]), countEixos.map(x => x[1]), 'fullEixos', 'Eixo', { 
         ...horizontalBarOptions,

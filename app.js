@@ -3,18 +3,20 @@ lucide.createIcons();
 
 // Elements
 const loadingStatus = document.getElementById('loading-status');
+const globalLoader = document.getElementById('global-loader');
 const navBtns = document.querySelectorAll('.nav-btn');
 const screens = document.querySelectorAll('.screen');
 const themeBtns = document.querySelectorAll('.theme-btn');
 const htmlEl = document.documentElement;
 const activeFiltersContainer = document.getElementById('active-filters-container');
 const activeFiltersBadges = document.getElementById('active-filters-badges');
-const btnClearFilters = document.getElementById('btn-clear-filters');
+const btnClearFilters = document.getElementById('btn-clear-filters-sidebar');
 
-let rawData = [];
-let charts = {};
-let mapChart = null;
-let geoJsonData = null;
+var rawData = [];
+var charts = {};
+var mapChart = null;
+var wordCloudChart = null;
+var geoJsonData = null;
 
 // ==========================================
 // STATE MANAGEMENT & CROSS FILTERING
@@ -23,14 +25,23 @@ const GlobalState = {
     filters: {
         'Eixo': null,
         'Estado': null,
+        'Órgão': null,
         'Unidade': null
     },
     tableFilters: {
         'Eixo': '',
         'Estado': '',
+        'Órgão': '',
         'Unidade': '',
         'Iniciativa BRUTA': '',
         'Iniciativa consolidada': ''
+    },
+    pagination: {
+        currentPage: 1,
+        pageSize: 50
+    },
+    specialFilters: {
+        'UnidadeGroup': null // 'MPU' or 'Outros'
     },
 
     setFilter(key, value) {
@@ -39,34 +50,45 @@ const GlobalState = {
         } else {
             this.filters[key] = value;
         }
+        this.pagination.currentPage = 1; // Reset pagination on filter change
         this.updateUI();
         processAndRender();
     },
 
     setTableFilter(key, value) {
         this.tableFilters[key] = value.toLowerCase();
+        this.pagination.currentPage = 1;
         renderTable();
     },
 
     clearGlobalFilters() {
-        this.filters = { 'Eixo': null, 'Estado': null, 'Unidade': null };
+        this.filters = { 'Eixo': null, 'Estado': null, 'Órgão': null, 'Unidade': null };
+        this.specialFilters.UnidadeGroup = null;
+        this.pagination.currentPage = 1;
         this.updateUI();
         processAndRender();
     },
 
     getFilteredData() {
         return rawData.filter(row => {
-            // Global Chart Filters (AND logic)
             if (this.filters['Eixo'] && row['Eixo'] !== this.filters['Eixo']) return false;
             if (this.filters['Estado'] && row['Estado'] !== this.filters['Estado']) return false;
+            if (this.filters['Órgão'] && row['Órgão'] !== this.filters['Órgão']) return false;
             if (this.filters['Unidade'] && row['Unidade'] !== this.filters['Unidade']) return false;
+            
+            if (this.specialFilters['UnidadeGroup']) {
+                const orgao = String(row['Órgão'] || '').toUpperCase().trim();
+                const isMPU = orgao.includes('MPU') || orgao.includes('MPF') || orgao.includes('MPT') || orgao.includes('MPM') || orgao.includes('CNMP');
+                
+                if (this.specialFilters['UnidadeGroup'] === 'MPU' && !isMPU) return false;
+                if (this.specialFilters['UnidadeGroup'] === 'Outros' && isMPU) return false;
+            }
             return true;
         });
     },
 
     getTableFilteredData(baseData) {
         return baseData.filter(row => {
-            // Table specific text filters (AND logic)
             for (let tKey in this.tableFilters) {
                 const term = this.tableFilters[tKey];
                 if (term) {
@@ -74,7 +96,6 @@ const GlobalState = {
                     if (!cellValue.includes(term)) return false;
                 }
             }
-            // Add global table search term
             const globalTerm = document.getElementById('table-search').value.toLowerCase();
             if (globalTerm) {
                 const matchesGlobal = Object.values(row).some(val => String(val).toLowerCase().includes(globalTerm));
@@ -85,98 +106,119 @@ const GlobalState = {
     },
 
     updateUI() {
-        const active = Object.entries(this.filters).filter(([k, v]) => v !== null);
+        let active = Object.entries(this.filters)
+            .filter(([k, v]) => v !== null)
+            .map(([k, v]) => [k, v]);
+        
+        // Incluir filtros especiais (MPU/Outros) na visualização
+        if (this.specialFilters.UnidadeGroup) {
+            active.push(['Grupo', this.specialFilters.UnidadeGroup]);
+        }
+
         if (active.length === 0) {
             activeFiltersContainer.style.display = 'none';
         } else {
             activeFiltersContainer.style.display = 'block';
             activeFiltersBadges.innerHTML = active.map(([k, v]) =>
-                `<span style="background: var(--accent); color: var(--bg-main); padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
-                    ${k}: <strong>${v}</strong>
-                    <i data-lucide="x" style="width: 14px; cursor: pointer;" onclick="GlobalState.setFilter('${k}', null)"></i>
-                 </span>`
+                `<div class="filter-badge" style="background: var(--accent); color: var(--bg-main); padding: 6px 10px; border-radius: 8px; font-size: 0.75rem; display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 4px;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;">${k}: <strong>${v}</strong></span>
+                    <i data-lucide="x" style="width: 14px; cursor: pointer; flex-shrink: 0;" onclick="GlobalState.clearSpecificFilter('${k}')"></i>
+                 </div>`
             ).join('');
             lucide.createIcons();
         }
+    },
+    
+    clearSpecificFilter(key) {
+        if (key === 'Grupo') {
+            this.specialFilters.UnidadeGroup = null;
+            document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+        } else {
+            this.filters[key] = null;
+        }
+        this.updateUI();
+        processAndRender();
     }
 };
 
-btnClearFilters.addEventListener('click', () => GlobalState.clearGlobalFilters());
+// ==========================================
+// UTILS & ANIMATIONS
+// ==========================================
+function getCssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function getThemeColors() { return [getCssVar('--chart-color-1'), getCssVar('--chart-color-2'), getCssVar('--chart-color-3'), getCssVar('--chart-color-4'), getCssVar('--chart-color-5')]; }
 
-document.querySelectorAll('.col-filter').forEach(input => {
-    input.addEventListener('input', (e) => {
-        GlobalState.setTableFilter(e.target.dataset.col, e.target.value);
-    });
-});
-document.getElementById('table-search').addEventListener('input', () => renderTable());
+function animateValue(id, start, end, duration) {
+    const obj = document.getElementById(id);
+    if (!obj) return;
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        obj.innerHTML = Math.floor(progress * (end - start) + start).toLocaleString();
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        }
+    };
+    window.requestAnimationFrame(step);
+}
 
-// Theme switcher
-themeBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        const theme = btn.getAttribute('data-theme-val');
-        htmlEl.setAttribute('data-theme', theme);
-        updateAllChartsColors();
-        if (mapChart) updateMapColors();
-    });
-});
-
-// Navigation
-navBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        if (btn.id === 'btn-clear-filters') return;
-        navBtns.forEach(b => { if (b.id !== 'btn-clear-filters') b.classList.remove('active'); });
-        btn.classList.add('active');
-        const targetId = btn.getAttribute('data-target');
-        screens.forEach(s => s.classList.remove('active'));
-        document.getElementById(targetId).classList.add('active');
-        // Resize charts that may be hidden
-        Object.values(charts).forEach(c => c.resize());
-        if (mapChart) mapChart.resize();
-    });
-});
-
-// Load Data
+// ==========================================
+// DATA LOADING
+// ==========================================
 async function loadData() {
     try {
-        const response = await fetch('Iniciativas_Consolidadas_20260303_v02.xlsx');
+        const response = await fetch('Iniciativas_Consolidadas_20260309_v03.xlsx');
         if (!response.ok) {
-            throw new Error("Erro ao carregar Excel.");
+            if (response.status === 404) throw new Error("Arquivo Excel não encontrado.");
+            throw new Error(`Erro ao buscar arquivo: ${response.status} ${response.statusText}`);
         }
+        
         const buffer = await response.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
+        
+        if (!workbook.SheetNames.length) throw new Error("O arquivo Excel parece estar vazio.");
+        
         rawData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
         loadingStatus.textContent = "Processando Excel...";
-
-        // Render data even if map fails
         processAndRender();
 
-        loadingStatus.textContent = "Dados carregados com sucesso!";
-        setTimeout(() => { loadingStatus.style.display = 'none'; }, 2000);
+        loadingStatus.textContent = "Dados Prontos!";
+        
+        // Premium Fade Out
+        setTimeout(() => {
+            if (globalLoader) {
+                globalLoader.classList.add('fade-out');
+                setTimeout(() => globalLoader.style.display = 'none', 600);
+            }
+        }, 800);
 
     } catch (error) {
         console.error("Critical Error Load Excel:", error);
-        loadingStatus.textContent = "Erro crítico ao carregar a planilha. Verifique o console.";
-        loadingStatus.style.color = "red";
-        return; // Stop if Excel fails
+        loadingStatus.textContent = "Erro crítico: " + error.message + " (Verifique o Console)";
+        loadingStatus.style.color = "#ff4444";
+        
+        // Dica amigável se for erro de CORS/Network
+        if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
+             loadingStatus.innerHTML += "<br><small style='font-size: 0.8rem;'>Dica: Use o 'iniciar_painel.bat' para rodar o servidor local.</small>";
+        }
     }
 
-    // Load Map Layout separately so it doesn't crash the graphs if missing
     try {
         const mapRes = await fetch('br-all.geo.json');
         if (mapRes.ok) {
             geoJsonData = await mapRes.json();
             echarts.registerMap('BR', geoJsonData);
-            processAndRender(); // Re-render to show map now
+            processAndRender();
         }
     } catch (error) {
         console.warn("Could not load highcharts geojson:", error);
     }
 }
 
-function getCssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-function getThemeColors() { return [getCssVar('--chart-color-1'), getCssVar('--chart-color-2'), getCssVar('--chart-color-3'), getCssVar('--chart-color-4'), getCssVar('--chart-color-5')]; }
-
+// ==========================================
+// CHARTS LOGIC
+// ==========================================
 function updateAllChartsColors() {
     const colors = getThemeColors();
     for (let key in charts) {
@@ -199,12 +241,18 @@ function updateAllChartsColors() {
 }
 
 function createOrUpdateChart(canvasId, type, labels, data, chartKey, filterField, axisConf = {}) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    const ctx = el.getContext('2d');
     const colors = getThemeColors();
 
     if (charts[chartKey]) {
         charts[chartKey].data.labels = labels;
-        charts[chartKey].data.datasets[0].data = data;
+        if (typeof data[0] === 'object' && data[0] !== null) {
+            charts[chartKey].data.datasets = data;
+        } else {
+            charts[chartKey].data.datasets[0].data = data;
+        }
         charts[chartKey].update();
         return;
     }
@@ -213,35 +261,56 @@ function createOrUpdateChart(canvasId, type, labels, data, chartKey, filterField
         type: type,
         data: {
             labels: labels,
-            datasets: [{ data: data, backgroundColor: colors, borderWidth: 1, borderColor: getCssVar('--bg-main'), borderRadius: type === 'bar' ? 4 : 0 }]
+            datasets: (typeof data[0] === 'object' && data[0] !== null) ? data : [{ 
+                label: 'Iniciativas',
+                data: data, 
+                backgroundColor: colors, 
+                borderWidth: 1, 
+                borderColor: getCssVar('--bg-main'), 
+                borderRadius: type === 'bar' ? 4 : 0 
+            }]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
+            responsive: true, 
+            maintainAspectRatio: false,
             onClick: (e, elements) => {
                 if (elements.length > 0) {
                     const idx = elements[0].index;
+                    const dsIdx = elements[0].datasetIndex;
                     const label = charts[chartKey].data.labels[idx];
+                    
+                    if (Array.isArray(data[0]) && typeof data[0] === 'object' && charts[chartKey].data.datasets[dsIdx].label) {
+                        GlobalState.setFilter('Eixo', charts[chartKey].data.datasets[dsIdx].label);
+                    }
+                    
                     GlobalState.setFilter(filterField, label);
                 }
             },
             onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
             plugins: {
-                legend: { display: type === 'pie' || type === 'doughnut', position: 'bottom', labels: { color: getCssVar('--text-main'), font: { family: getCssVar('--font-body') } } }
+                legend: { 
+                    display: (type === 'pie' || type === 'doughnut' || (Array.isArray(data[0]) && typeof data[0] === 'object')), 
+                    position: 'bottom', 
+                    labels: { color: getCssVar('--text-main'), font: { family: getCssVar('--font-body'), size: 10 }, boxWidth: 12 } 
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    titleColor: '#000',
+                    bodyColor: '#000',
+                    borderColor: 'rgba(0,0,0,0.1)',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: true,
+                    boxPadding: 6,
+                    usePointStyle: true
+                }
             },
             ...axisConf
         }
     };
-    charts[chartKey] = new Chart(ctx, config);
-}
+    
 
-function countBy(dataArray, prop) {
-    const counts = {};
-    dataArray.forEach(row => {
-        let val = row[prop];
-        if (!val) val = "Não Informado";
-        counts[val] = (counts[val] || 0) + 1;
-    });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    charts[chartKey] = new Chart(ctx, config);
 }
 
 const mapStateNames = {
@@ -251,115 +320,268 @@ const mapStateNames = {
 function processAndRender() {
     const data = GlobalState.getFilteredData();
 
-    // Update KPIs
-    document.getElementById('kpi-total').textContent = data.length;
+    // Update KPIs with animation
+    const oldTotal = parseInt(document.getElementById('kpi-total').textContent) || 0;
+    animateValue('kpi-total', oldTotal, data.length, 1000);
+
     const countEixos = countBy(data, 'Eixo');
-    document.getElementById('kpi-eixos').textContent = countEixos.length;
+    const oldEixos = parseInt(document.getElementById('kpi-eixos').textContent) || 0;
+    animateValue('kpi-eixos', oldEixos, countEixos.length, 1000);
 
     const countEstados = countBy(data, 'Estado');
     const countUnidades = countBy(data, 'Unidade');
+    
+    // Novos KPIs
+    const uniqueStates = [...new Set(data.map(d => d['Estado']))].filter(Boolean).length;
+    const uniqueUnits = [...new Set(data.map(d => d['Unidade']))].filter(Boolean).length;
+    animateValue('kpi-estados-count', 0, uniqueStates, 1000);
+    animateValue('kpi-orgaos-count', 0, uniqueUnits, 1000);
+
+    // Preparar Dados Empilhados para Estados (Garantir que os datasets existam mesmo sem dados)
+    const top5States = countEstados.slice(0, 5).map(x => x[0]);
+    const filteredBase = GlobalState.getFilteredData();
+    const eixosList = countEixos.map(x => x[0]);
+    const colors = getThemeColors();
+    
+    const stackedData = eixosList.map((eixo, i) => ({
+        label: eixo,
+        data: top5States.map(state => data.filter(d => d['Estado'] === state && d['Eixo'] === eixo).length),
+        backgroundColor: colors[i % colors.length],
+        stack: 'stack0'
+    }));
 
     const barOptions = {
         scales: {
-            x: { ticks: { color: getCssVar('--text-muted') }, grid: { color: getCssVar('--border-glass') } },
-            y: { ticks: { color: getCssVar('--text-muted') }, grid: { color: getCssVar('--border-glass') } }
+            x: { stacked: true, ticks: { color: getCssVar('--text-muted') }, grid: { color: getCssVar('--border-glass') } },
+            y: { stacked: true, ticks: { color: getCssVar('--text-muted') }, grid: { color: getCssVar('--border-glass') } }
         },
-        plugins: { legend: { display: false } }
+        plugins: { legend: { display: true } }
     };
     const horizontalBarOptions = { indexAxis: 'y', scales: barOptions.scales, plugins: barOptions.plugins };
 
-    // Charts
     createOrUpdateChart('chart-cover-eixos', 'doughnut', countEixos.slice(0, 5).map(x => x[0]), countEixos.slice(0, 5).map(x => x[1]), 'coverEixos', 'Eixo');
-    createOrUpdateChart('chart-cover-estados', 'bar', countEstados.slice(0, 5).map(x => x[0]), countEstados.slice(0, 5).map(x => x[1]), 'coverEstados', 'Estado', barOptions);
+    createOrUpdateChart('chart-cover-estados', 'bar', top5States, stackedData, 'coverEstados', 'Estado', barOptions);
     createOrUpdateChart('chart-full-eixos', 'bar', countEixos.map(x => x[0]), countEixos.map(x => x[1]), 'fullEixos', 'Eixo', horizontalBarOptions);
-    createOrUpdateChart('chart-full-unidades', 'bar', countUnidades.slice(0, 10).map(x => x[0]), countUnidades.slice(0, 10).map(x => x[1]), 'fullUnidades', 'Unidade', barOptions);
+    createOrUpdateChart('chart-full-unidades', 'bar', countUnidades.slice(0, 10).map(x => x[0]), countUnidades.slice(0, 10).map(x => x[1]), 'fullUnidades', 'Unidade', horizontalBarOptions);
 
-    // Extra charts Map / WordCloud
     renderMap(countEstados);
     renderWordCloud(data);
-
-    // Table
     renderTable();
+    updateGeoDetailsPanel();
+    renderInsights(data);
+
+    // Force resize for ECharts after DOM settles
+    setTimeout(() => {
+        if (mapChart) mapChart.resize();
+        if (wordCloudChart) wordCloudChart.resize();
+        if (charts.heatmap) charts.heatmap.resize();
+    }, 100);
 }
 
-let wordCloudChart = null;
+// ==========================================
+// INSIGHTS STRATEGICOS
+// ==========================================
+function renderInsights(data) {
+    renderPareto(data);
+    renderHeatmap(data);
+}
+
+function renderPareto(data) {
+    const counts = countBy(data, 'Órgão');
+    const labels = counts.map(x => x[0]);
+    const values = counts.map(x => x[1]);
+    const total = values.reduce((a, b) => a + b, 0);
+    
+    let acc = 0;
+    const lineData = values.map(v => {
+        acc += v;
+        return (acc / total) * 100;
+    });
+
+    const dataset = [
+        {
+            label: 'Iniciativas',
+            data: values,
+            backgroundColor: getCssVar('--accent'),
+            borderRadius: 6,
+            yAxisID: 'y'
+        },
+        {
+            label: '% Acumulada',
+            data: lineData,
+            type: 'line',
+            borderColor: '#ff6b6b',
+            backgroundColor: '#ff6b6b',
+            borderWidth: 3,
+            pointRadius: 4,
+            yAxisID: 'y1'
+        }
+    ];
+
+    const options = {
+        scales: {
+            y: { title: { display: true, text: 'Qtd Iniciativas' }, grid: { color: getCssVar('--border-glass') } },
+            y1: { 
+                position: 'right', 
+                min: 0, 
+                max: 100, 
+                title: { display: true, text: '% Acumulada' },
+                grid: { drawOnChartArea: false }
+            }
+        }
+    };
+
+    createOrUpdateChart('chart-pareto-orgaos', 'bar', labels, dataset, 'pareto', 'Órgão', options);
+}
+
+function renderHeatmap(data) {
+    const el = document.getElementById('chart-heatmap-eixo-orgao');
+    if (!el) return;
+    
+    if (!charts.heatmap) {
+        charts.heatmap = echarts.init(el);
+        window.addEventListener('resize', () => charts.heatmap && charts.heatmap.resize());
+    }
+
+    const eixos = [...new Set(rawData.map(d => d['Eixo']))].filter(Boolean);
+    const orgaos = [...new Set(rawData.map(d => d['Órgão']))].filter(Boolean).slice(0, 10); // Limitar top 10 para visualização
+
+    const heatmapData = [];
+    orgaos.forEach((org, orgIdx) => {
+        eixos.forEach((eixo, eixoIdx) => {
+            const val = data.filter(d => d['Órgão'] === org && d['Eixo'] === eixo).length;
+            heatmapData.push([eixoIdx, orgIdx, val || '-']);
+        });
+    });
+
+    const option = {
+        tooltip: { position: 'top' },
+        grid: { height: '70%', top: '15%', left: '15%' },
+        xAxis: { type: 'category', data: eixos, splitArea: { show: true }, axisLabel: { interval: 0, rotate: 30 } },
+        yAxis: { type: 'category', data: orgaos, splitArea: { show: true } },
+        visualMap: {
+            min: 0,
+            max: 10,
+            calculable: true,
+            orient: 'horizontal',
+            left: 'center',
+            bottom: '0%',
+            inRange: { color: [getCssVar('--chart-color-4'), getCssVar('--accent')] }
+        },
+        series: [{
+            name: 'Volume',
+            type: 'heatmap',
+            data: heatmapData,
+            label: { show: true },
+            emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
+        }]
+    };
+
+    charts.heatmap.setOption(option);
+}
+
+function updateInsightsHighlights(data) {
+    const container = document.getElementById('insights-highlights');
+    if (!container) return;
+
+    const countsOrg = countBy(rawData, 'Órgão');
+    const leaderOrg = countsOrg[0] ? countsOrg[0][0] : '-';
+    const leaderVal = countsOrg[0] ? countsOrg[0][1] : 0;
+
+    const countsState = countBy(rawData, 'Estado');
+    const leaderState = countsState[0] ? countsState[0][0] : '-';
+
+    const eixosPerOrg = {};
+    rawData.forEach(d => {
+        if (!eixosPerOrg[d['Órgão']]) eixosPerOrg[d['Órgão']] = new Set();
+        if (d['Eixo']) eixosPerOrg[d['Órgão']].add(d['Eixo']);
+    });
+    
+    let maxDiversityOrg = '-';
+    let maxDiversityVal = 0;
+    Object.entries(eixosPerOrg).forEach(([org, set]) => {
+        if (set.size > maxDiversityVal) {
+            maxDiversityVal = set.size;
+            maxDiversityOrg = org;
+        }
+    });
+
+    container.innerHTML = `
+        <div class="insight-card">
+            <div class="icon-box"><i data-lucide="award"></i></div>
+            <h4>Órgão Líder</h4>
+            <p>${leaderOrg}</p>
+            <span class="trend">${leaderVal} iniciativas totais</span>
+        </div>
+        <div class="insight-card">
+            <div class="icon-box"><i data-lucide="map"></i></div>
+            <h4>Estado em Destaque</h4>
+            <p>${leaderState}</p>
+            <span class="trend">Maior volume geográfico</span>
+        </div>
+        <div class="insight-card">
+            <div class="icon-box"><i data-lucide="zap"></i></div>
+            <h4>Maior Diversidade</h4>
+            <p>${maxDiversityOrg}</p>
+            <span class="trend">Atua em ${maxDiversityVal} eixos estratégicos</span>
+        </div>
+        <div class="insight-card">
+            <div class="icon-box"><i data-lucide="target"></i></div>
+            <h4>Foco Atual</h4>
+            <p>${countBy(data, 'Eixo')[0] ? countBy(data, 'Eixo')[0][0] : '-'}</p>
+            <span class="trend">Eixo com mais ações filtradas</span>
+        </div>
+    `;
+    lucide.createIcons();
+}
+
+// ==========================================
+// WORDCLOUD & MAP
+// ==========================================
+function updateMapColors() {
+    if (mapChart) {
+        const option = mapChart.getOption();
+        option.visualMap.inRange.color = ['transparent', getCssVar('--accent')];
+        option.series[0].itemStyle.borderColor = getCssVar('--bg-main');
+        mapChart.setOption(option);
+    }
+}
 
 function renderWordCloud(data) {
     if (!wordCloudChart) {
         let el = document.getElementById('chart-wordcloud');
         if (!el) return;
         wordCloudChart = echarts.init(el);
-        window.addEventListener('resize', () => {
-            if (wordCloudChart) wordCloudChart.resize();
-        });
-        wordCloudChart.on('click', function (params) {
+        window.addEventListener('resize', () => wordCloudChart && wordCloudChart.resize());
+        wordCloudChart.on('click', (params) => {
             const term = params.name;
-            // Cross table filtering (free text) by clicking on word cloud!
             GlobalState.setTableFilter('Iniciativa BRUTA', term);
-            GlobalState.setTableFilter('Iniciativa consolidada', term);
-            // switch screen to data to see the results
-            navBtns.forEach(b => {
-                if (b.getAttribute('data-target') === 'screen-data') b.click();
-            });
-
-            // flash the search box
+            navBtns.forEach(b => { if (b.getAttribute('data-target') === 'screen-data') b.click(); });
             document.getElementById('table-search').value = term;
-            GlobalState.getTableFilteredData(data); // force re-filter via global term manually since UI was bypassed
             renderTable();
         });
     }
 
     const stopWords = ['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'uma', 'os', 'no', 'se', 'na', 'por', 'mais', 'as', 'dos', 'como', 'mas', 'foi', 'ao', 'ele', 'das', 'tem', 'à', 'seu', 'sua', 'ou', 'ser', 'quando', 'muito', 'há', 'nos', 'já', 'está', 'eu', 'também', 'só', 'pelo', 'pela', 'até', 'isso', 'ela', 'entre', 'era', 'depois', 'sem', 'mesmo', 'aos', 'ter', 'seus', 'quem', 'nas', 'me', 'esse', 'eles', 'estão', 'você', 'tinha', 'foram', 'essa', 'num', 'nem', 'suas', 'meu', 'às', 'minha', 'têm', 'numa', 'pelos', 'elas', 'havia', 'seja', 'qual', 'será', 'nós', 'tenho', 'lhe', 'deles', 'essas', 'esses', 'pelas', 'este', 'fosse', 'dele', 'tu', 'te', 'vocês', 'vos', 'lhes', 'meus', 'minhas', 'teu', 'tua', 'teus', 'tuas', 'nosso', 'nossa', 'nossos', 'nossas', 'dela', 'delas', 'esta', 'estes', 'estas', 'aquele', 'aquela', 'aqueles', 'aquelas', 'isto', 'aquilo', 'estou', 'estamos', 'estive', 'esteve', 'estivemos', 'estiveram', 'estava', 'estávamos', 'estavam', 'estivera', 'estivéramos', 'esteja', 'estejamos', 'estejam', 'estivesse', 'estivéssemos', 'estivessem', 'estiver', 'estivermos', 'estiverem', 'hei', 'há', 'havemos', 'hão', 'houve', 'houvemos', 'houveram', 'houvera', 'houvéramos', 'haja', 'hajamos', 'hajam', 'houvesse', 'houvéssemos', 'houvessem', 'houver', 'houvermos', 'houverem', 'houverei', 'houverá', 'houveremos', 'houverão', 'houveria', 'houveríamos', 'houveriam', 'sou', 'somos', 'são', 'era', 'éramos', 'eram', 'fui', 'foi', 'fomos', 'foram', 'fora', 'fôramos', 'seja', 'sejamos', 'sejam', 'fosse', 'fôssemos', 'fossem', 'for', 'formos', 'forem', 'serei', 'será', 'seremos', 'serão', 'seria', 'seríamos', 'seriam', 'tenho', 'tem', 'temos', 'tém', 'tinha', 'tínhamos', 'tinham', 'tive', 'teve', 'tivemos', 'tiveram', 'tivera', 'tivéramos', 'tenha', 'tenhamos', 'tenham', 'tivesse', 'tivéssemos', 'tivessem', 'tiver', 'tivermos', 'tiverem', 'terei', 'terá', 'teremos', 'terão', 'teria', 'teríamos', 'teriam'];
     const wordCounts = {};
-
     data.forEach(row => {
         const text = (row['Iniciativa BRUTA'] || '') + " " + (row['Iniciativa consolidada'] || '');
-        const words = text.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "").split(/\s+/);
-
-        words.forEach(word => {
-            if (word.length > 3 && !stopWords.includes(word)) {
-                wordCounts[word] = (wordCounts[word] || 0) + 1;
-            }
+        // Substituindo pontuações por espaço para não colar palavras (ex: adequação/substituição)
+        text.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, " ").split(/\s+/).forEach(word => {
+            if (word.length > 3 && !stopWords.includes(word)) wordCounts[word] = (wordCounts[word] || 0) + 1;
         });
     });
 
-    // top 80 words
-    const topWords = Object.entries(wordCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 80)
-        .map(w => ({ name: w[0], value: w[1] }));
-
+    const topWords = Object.entries(wordCounts).sort((a,b) => b[1]-a[1]).slice(0, 150).map(w => ({ name: w[0], value: w[1] }));
     wordCloudChart.setOption({
         tooltip: { show: true },
         series: [{
-            type: 'wordCloud',
-            shape: 'circle',
-            keepAspect: true,
-            left: 'center', top: 'center', width: '90%', height: '90%',
-            sizeRange: [12, 60],
-            rotationRange: [-45, 45],
-            gridSize: 8,
-            textStyle: {
-                fontFamily: getCssVar('--font-heading'),
-                fontWeight: 'bold',
-                color: function () {
-                    const colors = [getCssVar('--chart-color-1'), getCssVar('--chart-color-2'), getCssVar('--chart-color-3'), getCssVar('--chart-color-4'), getCssVar('--text-muted')];
-                    return colors[Math.floor(Math.random() * colors.length)];
-                }
-            },
+            type: 'wordCloud', shape: 'circle', keepAspect: true, width: '100%', height: '100%',
+            sizeRange: [8, 50], rotationRange: [-90, 90], gridSize: 2, drawOutOfBound: true,
+            textStyle: { fontFamily: getCssVar('--font-heading'), fontWeight: 'bold', color: () => getThemeColors()[Math.floor(Math.random() * 5)] },
             data: topWords
         }]
     });
-}
-
-function updateMapColors() {
-    if (mapChart) {
-        const option = mapChart.getOption();
-        option.visualMap[0].inRange.color = ['transparent', getCssVar('--accent')];
-        option.visualMap[0].textStyle.color = getCssVar('--text-main');
-        option.series[0].itemStyle.borderColor = getCssVar('--bg-main');
-        mapChart.setOption(option);
-    }
 }
 
 function renderMap(countEstados) {
@@ -369,60 +591,167 @@ function renderMap(countEstados) {
 
     if (!mapChart) {
         mapChart = echarts.init(document.getElementById('map-brasil'));
-        mapChart.on('click', function (params) {
+        mapChart.on('click', (params) => {
             if (params.data && params.data.ufOriginal) {
-                GlobalState.setFilter('Estado', params.data.ufOriginal);
+                const uf = params.data.ufOriginal;
+                GlobalState.setFilter('Estado', uf);
+                updateGeoDetails(uf, params.data.name);
             }
         });
-        window.addEventListener('resize', () => mapChart.resize());
+        window.addEventListener('resize', () => mapChart && mapChart.resize());
     }
 
     mapChart.setOption({
         tooltip: { trigger: 'item', formatter: '{b}<br/>Iniciativas: {c}' },
-        visualMap: {
-            left: 'right', min: 0, max: maxVal,
-            inRange: { color: ['transparent', getCssVar('--accent')] },
-            text: ['Máx', 'Mín'], calculable: true,
-            textStyle: { color: getCssVar('--text-main') }
-        },
-        series: [{
-            name: 'Iniciativas', type: 'map', map: 'BR', roam: true,
-            aspectScale: 0.9,
-            zoom: 1.1,
-            itemStyle: { borderColor: getCssVar('--bg-main'), areaColor: 'rgba(128,128,128,0.1)' },
-            emphasis: { itemStyle: { areaColor: getCssVar('--accent-hover') }, label: { show: true, color: '#fff' } },
-            data: mapData
-        }]
+        visualMap: { show: false, min: 0, max: maxVal, inRange: { color: ['transparent', getCssVar('--accent')] } },
+        series: [{ type: 'map', map: 'BR', roam: true, zoom: 1.1, itemStyle: { borderColor: getCssVar('--bg-main'), areaColor: 'rgba(128,128,128,0.1)' }, emphasis: { itemStyle: { areaColor: getCssVar('--accent-hover') }, label: { show: true, color: '#fff' } }, data: mapData }]
+    }, true);
+}
+
+function updateGeoDetailsPanel() {
+    const selectedState = GlobalState.filters['Estado'];
+    const container = document.getElementById('geo-details-content');
+    if (!container) return;
+
+    if (selectedState) {
+        updateGeoDetails(selectedState, mapStateNames[selectedState] || selectedState);
+    } else {
+        container.innerHTML = `<p class="empty-msg">Clique em um estado no mapa para ver o detalhamento.</p>`;
+    }
+}
+
+function updateGeoDetails(uf, stateName) {
+    const container = document.getElementById('geo-details-content');
+    if (!container) return;
+    
+    const stateData = rawData.filter(d => d['Estado'] === uf);
+    if (stateData.length === 0) {
+        container.innerHTML = `<p class="empty-msg">Nenhuma iniciativa encontrada para ${stateName}.</p>`;
+        return;
+    }
+
+    container.innerHTML = `<h4 style="margin-bottom:15px; color:var(--text-main)">${stateName} (${stateData.length} iniciativas)</h4>`;
+    
+    // Agrupar por eixo para o detalhamento lateral
+    const components = {};
+    stateData.forEach(d => {
+        const eixo = d['Eixo'] || 'Outros';
+        if (!components[eixo]) components[eixo] = [];
+        components[eixo].push(d['Iniciativa consolidada'] || d['Iniciativa BRUTA']);
+    });
+
+    Object.entries(components).forEach(([eixo, items]) => {
+        const div = document.createElement('div');
+        div.className = 'geo-detail-item';
+        div.innerHTML = `
+            <h5>${eixo}</h5>
+            <p>${items.length} ação(ões) capturada(s). Clique para ver na base de dados.</p>
+        `;
+        div.style.cursor = 'pointer';
+        div.onclick = () => {
+            GlobalState.setFilter('Eixo', eixo);
+            navBtns.forEach(b => { if (b.getAttribute('data-target') === 'screen-data') b.click(); });
+        };
+        container.appendChild(div);
     });
 }
 
+// ==========================================
+// TABLE & PAGINATION
+// ==========================================
 const tableBody = document.querySelector('#data-table tbody');
 const tableCount = document.getElementById('table-count');
+const pageIndicator = document.getElementById('page-indicator');
 
 function renderTable() {
-    const dataToRender = GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    const fullData = GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    const totalPages = Math.ceil(fullData.length / GlobalState.pagination.pageSize) || 1;
+    
+    if (GlobalState.pagination.currentPage > totalPages) GlobalState.pagination.currentPage = totalPages;
+    
+    const start = (GlobalState.pagination.currentPage - 1) * GlobalState.pagination.pageSize;
+    const end = start + GlobalState.pagination.pageSize;
+    const dataToRender = fullData.slice(start, end);
+
     tableBody.innerHTML = '';
-
-    // render top 100 max for performance, it's vanilla DOM
-    const maxRender = 100;
-    const toRender = dataToRender.slice(0, maxRender);
-
-    toRender.forEach(row => {
+    dataToRender.forEach(row => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${row['Eixo'] || '-'}</td>
-            <td>${row['Estado'] || '-'}</td>
-            <td>${row['Unidade'] || '-'}</td>
-            <td>${row['Iniciativa BRUTA'] || '-'}</td>
-            <td>${row['Iniciativa consolidada'] || '-'}</td>
-        `;
+        tr.innerHTML = `<td>${row['Eixo'] || '-'}</td><td>${row['Estado'] || '-'}</td><td>${row['Órgão'] || '-'}</td><td>${row['Unidade'] || '-'}</td><td>${row['Iniciativa BRUTA'] || '-'}</td><td>${row['Iniciativa consolidada'] || '-'}</td>`;
         tableBody.appendChild(tr);
     });
 
-    let msg = `Mostrando ${toRender.length} de ${dataToRender.length} registros`;
-    if (dataToRender.length > maxRender) msg += ` (Limitado aos top ${maxRender} na tela)`;
-    tableCount.textContent = msg;
+    tableCount.textContent = `Mostrando ${start + 1} - ${Math.min(end, fullData.length)} de ${fullData.length} registros`;
+    pageIndicator.textContent = `Página ${GlobalState.pagination.currentPage} de ${totalPages}`;
+}
+
+// ==========================================
+// EXPORT LOGIC
+// ==========================================
+function exportToExcel() {
+    const data = GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    if (data.length === 0) return alert("Não há dados para exportar com os filtros atuais.");
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Iniciativas");
+    XLSX.writeFile(wb, "BI_PLS_Export.xlsx");
+}
+
+// ==========================================
+// EVENT LISTENERS
+// ==========================================
+document.getElementById('btn-page-prev').addEventListener('click', () => { if (GlobalState.pagination.currentPage > 1) { GlobalState.pagination.currentPage--; renderTable(); } });
+document.getElementById('btn-page-next').addEventListener('click', () => { 
+    const fullData = GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    if (GlobalState.pagination.currentPage < Math.ceil(fullData.length / GlobalState.pagination.pageSize)) { GlobalState.pagination.currentPage++; renderTable(); } 
+});
+
+document.getElementById('btn-export-csv').addEventListener('click', exportToExcel);
+btnClearFilters.addEventListener('click', () => {
+    GlobalState.specialFilters.UnidadeGroup = null;
+    document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+    GlobalState.clearGlobalFilters();
+});
+
+document.querySelectorAll('.quick-btn').forEach(btn => btn.addEventListener('click', () => {
+    const group = btn.dataset.filterUnit;
+    if (GlobalState.specialFilters.UnidadeGroup === group) {
+        GlobalState.specialFilters.UnidadeGroup = null;
+        btn.classList.remove('active');
+    } else {
+        document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+        GlobalState.specialFilters.UnidadeGroup = group;
+        btn.classList.add('active');
+    }
+    GlobalState.updateUI(); // Adicionado para atualizar sidebar imediatamente
+    processAndRender();
+}));
+
+document.querySelectorAll('.col-filter').forEach(input => input.addEventListener('input', (e) => GlobalState.setTableFilter(e.target.dataset.col, e.target.value)));
+document.getElementById('table-search').addEventListener('input', () => renderTable());
+
+themeBtns.forEach(btn => btn.addEventListener('click', () => { htmlEl.setAttribute('data-theme', btn.dataset.themeVal); updateAllChartsColors(); if (mapChart) updateMapColors(); }));
+navBtns.forEach(btn => btn.addEventListener('click', () => {
+    if (btn.classList.contains('clear-btn')) return;
+    navBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    screens.forEach(s => s.classList.remove('active'));
+    document.getElementById(btn.dataset.target).classList.add('active');
+    
+    // Pequeno delay para garantir que a aba está visível antes de redimensionar
+    setTimeout(() => {
+        Object.values(charts).forEach(c => c.resize());
+        if (mapChart) mapChart.resize();
+        if (wordCloudChart) wordCloudChart.resize();
+    }, 100);
+}));
+
+function countBy(dataArray, prop) {
+    const counts = {};
+    dataArray.forEach(row => { let val = row[prop] || "Não Informado"; counts[val] = (counts[val] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
 }
 
 // Start
 loadData();
+

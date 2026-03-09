@@ -23,6 +23,12 @@
 </head>
 
 <body>
+    <!-- Premium Loader Curtain -->
+    <div id="global-loader" class="glass-loader">
+        <div class="spinner"></div>
+        <p id="loading-status">Carregando dados...</p>
+    </div>
+
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <nav class="sidebar glass-panel">
@@ -36,18 +42,26 @@
                 <li><button class="nav-btn" data-target="screen-eixos"><i data-lucide="pie-chart"></i> Eixos</button>
                 </li>
                 <li><button class="nav-btn" data-target="screen-geo"><i data-lucide="map"></i> Geográfico</button></li>
+                <li><button class="nav-btn" data-target="screen-insights"><i data-lucide="trending-up"></i> Insights</button></li>
                 <li><button class="nav-btn" data-target="screen-data"><i data-lucide="database"></i> Dados
                         Brutos</button></li>
             </ul>
+            
+            <div class="sidebar-footer">
+                <div id="active-filters-container" class="glass-panel" style="display: none; margin-bottom: 10px; padding: 10px;">
+                    <div id="active-filters-badges" style="display: flex; flex-wrap: wrap; gap: 5px;"></div>
+                </div>
+                <button class="nav-btn clear-btn" id="btn-clear-filters-sidebar">
+                    <i data-lucide="eraser"></i> Limpar Filtros
+                </button>
+            </div>
         </nav>
 
         <!-- Main Content Area -->
         <main class="main-content">
-            <!-- Header for Theme Controls and Status -->
+            <!-- Header for Theme Controls -->
             <header class="top-bar glass-panel">
-                <div class="status-indicator">
-                    <span id="loading-status">Carregando dados...</span>
-                </div>
+                <div class="spacer" style="flex:1;"></div>
                 <div class="theme-controls">
                     <span class="theme-label">Tema:</span>
                     <button class="theme-btn" data-theme-val="praia" title="Areia / Praia"><i
@@ -76,6 +90,16 @@
                                 Navegue pelos menus laterais para visualizar as aberturas por <strong>Eixos de
                                     Atuação</strong> e a <strong>Distribuição Geográfica</strong> (Estados e Unidades).
                             </p>
+                            
+                            <!-- Quick Filter Buttons -->
+                            <div class="quick-filters">
+                                <span class="filter-label">Atalhos de Unidade:</span>
+                                <div class="filter-group">
+                                    <button class="quick-btn" data-filter-unit="MPU"><i data-lucide="shield-check"></i> MPU</button>
+                                    <button class="quick-btn" data-filter-unit="Outros"><i data-lucide="building"></i> Outros Órgãos</button>
+                                </div>
+                            </div>
+
                             <div class="kpi-cards">
                                 <div class="kpi-card glass-panel" id="kpi-card-total">
                                     <h4 id="kpi-total">0</h4>
@@ -83,20 +107,22 @@
                                 </div>
                                 <div class="kpi-card glass-panel" id="kpi-card-eixos">
                                     <h4 id="kpi-eixos">0</h4>
-                                    <span>Eixos Únicos</span>
+                                    <span>Eixos de Atuação</span>
+                                </div>
+                                <div class="kpi-card glass-panel" id="kpi-card-estados">
+                                    <h4 id="kpi-estados-count">0</h4>
+                                    <span>Estados Avaliados</span>
+                                </div>
+                                <div class="kpi-card glass-panel" id="kpi-orgaos">
+                                    <h4 id="kpi-orgaos-count">0</h4>
+                                    <span>Órgãos / Unidades</span>
                                 </div>
                             </div>
-                            <!-- Active Filters Display -->
-                            <div id="active-filters-container" style="display: none; margin-top: 20px;">
-                                <div
-                                    style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                                    <strong>Filtros Ativos:</strong>
-                                    <button id="btn-clear-filters" class="nav-btn"
-                                        style="padding: 6px 12px; font-size: 0.8rem; width: auto; border: 1px solid var(--border-glass);">Limpar
-                                        Filtros</button>
-                                </div>
-                                <div id="active-filters-badges" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
-                            </div>
+                            
+                            <p class="filter-note">
+                                <i data-lucide="info" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
+                                * Os filtros são cumulativos e refinam o painel de forma dinâmica.
+                            </p>
                         </div>
                         <div class="cover-charts">
                             <div class="chart-container glass-panel">
@@ -121,17 +147,18 @@
                         <h2>Análise por Eixos de Atuação</h2>
                         <p>Visão detalhada do volume de iniciativas em cada eixo temático.</p>
                     </div>
-                    <div class="chart-grid">
-                        <div class="chart-container glass-panel full-width">
-                            <h3>Todas as Iniciativas por Eixo</h3>
+                    <div class="chart-grid two-cols">
+                        <div class="chart-container glass-panel">
+                            <h3>Volume Detalhado por Eixo</h3>
                             <div class="canvas-wrapper-large">
                                 <canvas id="chart-full-eixos"></canvas>
                             </div>
                         </div>
-                        <div class="chart-container glass-panel full-width">
-                            <h3>Nuvem de Palavras (Termos Frequentes nas Iniciativas)</h3>
-                            <div class="canvas-wrapper-large">
-                                <div id="chart-wordcloud" style="width: 100%; height: 100%;"></div>
+                        <div class="chart-container glass-panel">
+                            <h3>Nuvem de Termos</h3>
+                            <p class="chart-desc">Termos mais frequentes nas iniciativas consolidadas, indicando temas recorrentes.</p>
+                            <div class="canvas-wrapper-large" style="height: 540px;">
+                                <div id="chart-wordcloud" style="width:100%; height:100%;"></div>
                             </div>
                         </div>
                     </div>
@@ -143,26 +170,65 @@
                         <h2>Distribuição Geográfica e Institucional</h2>
                         <p>Análise de iniciativas filtradas por Estado e por Unidade/Órgão.</p>
                     </div>
-                    <div class="chart-grid geo-cols">
-                        <div class="chart-container glass-panel">
-                            <h3>Mapa Interativo de Iniciativas</h3>
+                    <div class="geo-layout">
+                        <div class="chart-container glass-panel map-main">
+                            <h3>Mapa de Iniciativas por Estado</h3>
                             <div class="canvas-wrapper-xl">
-                                <div id="map-brasil" style="width: 100%; height: 100%;"></div>
+                                <div id="map-brasil" style="width:100%; height:100%;"></div>
+                            </div>
+                        </div>
+                        <div class="geo-details glass-panel" id="geo-details-panel">
+                            <h3>Detalhes Selecionados</h3>
+                            <div id="geo-details-content" class="details-content">
+                                <p class="empty-msg">Clique em um estado no mapa para ver o detalhamento agora.</p>
                             </div>
                         </div>
                         <div class="chart-container glass-panel">
-                            <h3>Top 10 Unidades (Volume)</h3>
-                            <div class="canvas-wrapper">
+                            <h3>Top 10 Unidades / Órgãos</h3>
+                            <div class="canvas-wrapper-xl">
                                 <canvas id="chart-full-unidades"></canvas>
                             </div>
                         </div>
                     </div>
                 </section>
 
+                <!-- Screen 4: Insights Estratégicos -->
+                <section id="screen-insights" class="screen">
+                    <div class="glass-panel screen-header">
+                        <h2>Insights Estratégicos</h2>
+                        <p>Análise avançada de concentração, Pareto e cruzamento de dados por Órgão.</p>
+                    </div>
+                    
+                    <div class="chart-grid two-cols">
+                        <div class="chart-container glass-panel">
+                            <h3>Análise de Pareto: Iniciativas por Órgão</h3>
+                            <div class="canvas-wrapper-large">
+                                <canvas id="chart-pareto-orgaos"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-container glass-panel">
+                            <h3>Matriz de Calor: Eixo vs Órgão</h3>
+                            <div class="canvas-wrapper-large">
+                                <div id="chart-heatmap-eixo-orgao" style="width:100%; height:100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </section>
+
+
                 <!-- Screen 4: Base de Dados -->
                 <section id="screen-data" class="screen">
                     <div class="glass-panel screen-header">
-                        <h2>Base de Dados Bruta</h2>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <h2>Base de Dados Bruta</h2>
+                                <p>Tabela detalhada com sistema avançado de filtros independentes.</p>
+                            </div>
+                            <button id="btn-export-csv" class="theme-btn export-btn" title="Exportar Dados (CSV)" style="width: auto; padding: 0 16px; border-radius: 8px;">
+                                <i data-lucide="download"></i> <span style="margin-left:8px; font-size:0.9rem; font-weight:600;">Exportar XLSX/CSV</span>
+                            </button>
+                        </div>
                         <div class="table-controls">
                             <input type="text" id="table-search" placeholder="Buscar em qualquer coluna..."
                                 class="glass-input">
@@ -175,6 +241,7 @@
                                 <tr>
                                     <th>Eixo</th>
                                     <th>Estado</th>
+                                    <th>Órgão</th>
                                     <th>Unidade</th>
                                     <th>Iniciativa Bruta</th>
                                     <th>Iniciativa Consolidada</th>
@@ -184,6 +251,8 @@
                                             placeholder="Filtrar Eixo..."></th>
                                     <th><input type="text" class="col-filter" data-col="Estado"
                                             placeholder="Filtrar Estado..."></th>
+                                    <th><input type="text" class="col-filter" data-col="Órgão"
+                                            placeholder="Filtrar Órgão..."></th>
                                     <th><input type="text" class="col-filter" data-col="Unidade"
                                             placeholder="Filtrar Unidade..."></th>
                                     <th><input type="text" class="col-filter" data-col="Iniciativa BRUTA"
@@ -197,13 +266,19 @@
                             </tbody>
                         </table>
                     </div>
+                    <!-- Pagination Controls -->
+                    <div class="pagination-controls glass-panel" style="margin-top: 16px; display: flex; justify-content: center; gap: 8px;">
+                        <button id="btn-page-prev" class="nav-btn" style="width:auto; padding: 6px 16px;"><i data-lucide="chevron-left"></i> Anterior</button>
+                        <span id="page-indicator" style="display: flex; align-items: center; padding: 0 16px; font-weight: 600; color: var(--text-main);">Página 1</span>
+                        <button id="btn-page-next" class="nav-btn" style="width:auto; padding: 6px 16px;">Próximo <i data-lucide="chevron-right"></i></button>
+                    </div>
                 </section>
 
             </div>
         </main>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2"></script>
 </body>
 
 </html>

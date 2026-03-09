@@ -147,6 +147,13 @@ const GlobalState = {
 // ==========================================
 function getCssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
+function hexToRGBA(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function getThemeColors(labels) { 
     if (!labels || labels.length === 0) {
         return [getCssVar('--chart-color-1'), getCssVar('--chart-color-2'), getCssVar('--chart-color-3'), getCssVar('--chart-color-4'), getCssVar('--chart-color-5')];
@@ -303,6 +310,12 @@ function createOrUpdateChart(canvasId, type, labels, data, chartKey, filterField
             charts[chartKey].data.datasets = data;
         } else {
             charts[chartKey].data.datasets[0].data = data;
+            // Garantir que cores customizadas sejam aplicadas na atualização
+            if (axisConf.customDatasetColors) {
+                charts[chartKey].data.datasets[0].backgroundColor = axisConf.customDatasetColors;
+            } else {
+                charts[chartKey].data.datasets[0].backgroundColor = colors;
+            }
         }
         charts[chartKey].update();
         return;
@@ -442,38 +455,17 @@ function renderInsights(data) {
 
 function renderPareto(data) {
     const counts = countBy(data, 'Órgão');
-    // Garantir ordenação decrescente para o Pareto
     counts.sort((a, b) => b[1] - a[1]);
     
     const labels = counts.map(x => x[0]);
     const values = counts.map(x => x[1]);
-    const total = values.reduce((a, b) => a + b, 0);
-    
-    let acc = 0;
-    const lineData = values.map(v => {
-        acc += v;
-        return (acc / total) * 100;
-    });
 
     const dataset = [
         {
             label: 'Volume por Órgão',
             data: values,
             backgroundColor: getCssVar('--accent'),
-            borderRadius: 6,
-            yAxisID: 'y'
-        },
-        {
-            label: '% Acumulada',
-            data: lineData,
-            type: 'line',
-            borderColor: '#ff6b6b',
-            backgroundColor: '#ff6b6b',
-            borderWidth: 3,
-            pointRadius: 6,
-            pointHoverRadius: 8,
-            tension: 0.1, // Curva suave
-            yAxisID: 'y1'
+            borderRadius: 6
         }
     ];
 
@@ -483,14 +475,6 @@ function renderPareto(data) {
                 beginAtZero: true,
                 title: { display: true, text: 'Qtd Iniciativas' }, 
                 grid: { color: getCssVar('--border-glass') } 
-            },
-            y1: { 
-                position: 'right', 
-                min: 0, 
-                max: 100, 
-                title: { display: true, text: '% Acumulada' },
-                grid: { drawOnChartArea: false },
-                ticks: { callback: value => value + '%' }
             }
         }
     };
@@ -511,10 +495,25 @@ function renderHeatmap(data) {
     const orgaos = [...new Set(rawData.map(d => d['Órgão']))].filter(Boolean).slice(0, 10); // Limitar top 10 para visualização
 
     const heatmapData = [];
+    let maxVal = 0;
+    orgaos.forEach(org => {
+        eixos.forEach(eixo => {
+            const val = data.filter(d => d['Órgão'] === org && d['Eixo'] === eixo).length;
+            if (val > maxVal) maxVal = val;
+        });
+    });
+
     orgaos.forEach((org, orgIdx) => {
         eixos.forEach((eixo, eixoIdx) => {
             const val = data.filter(d => d['Órgão'] === org && d['Eixo'] === eixo).length;
-            heatmapData.push([eixoIdx, orgIdx, val || '-']);
+            const eixoColor = GlobalState.customColors[eixo] || getCssVar('--accent');
+            // Calcula intensidade baseada no valor (min 10% opacity se val > 0)
+            const alpha = val > 0 ? Math.max(0.1, val / maxVal) : 0;
+            
+            heatmapData.push({
+                value: [eixoIdx, orgIdx, val || '-'],
+                itemStyle: { color: hexToRGBA(eixoColor, alpha) }
+            });
         });
     });
 
@@ -533,20 +532,12 @@ function renderHeatmap(data) {
             } 
         },
         yAxis: { type: 'category', data: orgaos, splitArea: { show: true } },
-        visualMap: {
-            min: 0,
-            max: 10,
-            calculable: true,
-            orient: 'horizontal',
-            left: 'center',
-            bottom: '0%',
-            inRange: { color: [getCssVar('--bg-main'), getCssVar('--accent')] }
-        },
+        visualMap: { show: false }, // Desativado pois usamos cores manuais por Eixo
         series: [{
             name: 'Volume',
             type: 'heatmap',
             data: heatmapData,
-            label: { show: true },
+            label: { show: true, color: '#2c3e50', fontWeight: 'bold' },
             emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
         }]
     };
@@ -725,8 +716,9 @@ function updateGeoDetails(uf, stateName) {
     Object.entries(components).forEach(([eixo, items]) => {
         const div = document.createElement('div');
         div.className = 'geo-detail-item';
+        const eixoColor = GlobalState.customColors[eixo] || getCssVar('--accent');
         div.innerHTML = `
-            <h5>${eixo}</h5>
+            <h5 style="color: ${eixoColor}">${eixo}</h5>
             <p>${items.length} ação(ões) capturada(s). Clique para ver na base de dados.</p>
         `;
         div.style.cursor = 'pointer';

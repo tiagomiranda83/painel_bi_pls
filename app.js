@@ -43,6 +43,7 @@ const GlobalState = {
     specialFilters: {
         'UnidadeGroup': null // 'MPU' or 'Outros'
     },
+    customColors: {}, // Mapeamento Eixo -> Hex
 
     setFilter(key, value) {
         if (this.filters[key] === value) {
@@ -145,7 +146,45 @@ const GlobalState = {
 // UTILS & ANIMATIONS
 // ==========================================
 function getCssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-function getThemeColors() { return [getCssVar('--chart-color-1'), getCssVar('--chart-color-2'), getCssVar('--chart-color-3'), getCssVar('--chart-color-4'), getCssVar('--chart-color-5')]; }
+
+function getThemeColors(labels) { 
+    if (!labels || labels.length === 0) {
+        return [getCssVar('--chart-color-1'), getCssVar('--chart-color-2'), getCssVar('--chart-color-3'), getCssVar('--chart-color-4'), getCssVar('--chart-color-5')];
+    }
+    // Retorna as cores mapeadas para os labels (Eixos) fornecidos
+    return labels.map(label => GlobalState.customColors[label] || getCssVar('--accent'));
+}
+
+function initLegend() {
+    const legendContainer = document.getElementById('legend-controls');
+    if (!legendContainer) return;
+
+    const eixos = [...new Set(rawData.map(d => d['Eixo']))].filter(Boolean).sort();
+    const defaultColors = [getCssVar('--chart-color-1'), getCssVar('--chart-color-2'), getCssVar('--chart-color-3'), getCssVar('--chart-color-4'), getCssVar('--chart-color-5')];
+
+    legendContainer.innerHTML = '';
+    eixos.forEach((eixo, idx) => {
+        if (!GlobalState.customColors[eixo]) {
+            GlobalState.customColors[eixo] = defaultColors[idx % defaultColors.length];
+        }
+
+        const item = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `
+            <input type="color" value="${GlobalState.customColors[eixo]}" data-eixo="${eixo}">
+            <span title="${eixo}">${eixo}</span>
+        `;
+        
+        const input = item.querySelector('input');
+        input.addEventListener('change', (e) => {
+            GlobalState.customColors[eixo] = e.target.value;
+            updateAllChartsColors();
+            processAndRender();
+        });
+
+        legendContainer.appendChild(item);
+    });
+}
 
 function animateValue(id, start, end, duration) {
     const obj = document.getElementById(id);
@@ -181,6 +220,7 @@ async function loadData() {
         rawData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
         loadingStatus.textContent = "Processando Excel...";
+        initLegend(); // Inicializa cores dinâmicas dos eixos
         processAndRender();
 
         loadingStatus.textContent = "Dados Prontos!";
@@ -220,11 +260,18 @@ async function loadData() {
 // CHARTS LOGIC
 // ==========================================
 function updateAllChartsColors() {
-    const colors = getThemeColors();
     for (let key in charts) {
         const chart = charts[key];
+        const labels = chart.data.labels;
+        const colors = getThemeColors(labels);
+        
         chart.data.datasets.forEach(dataset => {
-            dataset.backgroundColor = colors;
+            // Se o dataset tiver label próprio (como nos empilhados), usa a cor do label do dataset
+            if (dataset.label && GlobalState.customColors[dataset.label]) {
+                dataset.backgroundColor = GlobalState.customColors[dataset.label];
+            } else {
+                dataset.backgroundColor = colors;
+            }
             dataset.borderColor = getCssVar('--bg-main');
         });
         if (chart.options.plugins?.legend?.labels) chart.options.plugins.legend.labels.color = getCssVar('--text-main');
@@ -339,14 +386,12 @@ function processAndRender() {
 
     // Preparar Dados Empilhados para Estados (Garantir que os datasets existam mesmo sem dados)
     const top5States = countEstados.slice(0, 5).map(x => x[0]);
-    const filteredBase = GlobalState.getFilteredData();
     const eixosList = countEixos.map(x => x[0]);
-    const colors = getThemeColors();
     
     const stackedData = eixosList.map((eixo, i) => ({
         label: eixo,
         data: top5States.map(state => data.filter(d => d['Estado'] === state && d['Eixo'] === eixo).length),
-        backgroundColor: colors[i % colors.length],
+        backgroundColor: GlobalState.customColors[eixo] || getThemeColors()[i % 5],
         stack: 'stack0'
     }));
 
@@ -578,7 +623,10 @@ function renderWordCloud(data) {
         series: [{
             type: 'wordCloud', shape: 'circle', keepAspect: true, width: '100%', height: '100%',
             sizeRange: [8, 50], rotationRange: [-90, 90], gridSize: 2, drawOutOfBound: true,
-            textStyle: { fontFamily: getCssVar('--font-heading'), fontWeight: 'bold', color: () => getThemeColors()[Math.floor(Math.random() * 5)] },
+            textStyle: { fontFamily: getCssVar('--font-heading'), fontWeight: 'bold', color: () => {
+                const colors = getThemeColors();
+                return colors[Math.floor(Math.random() * colors.length)];
+            }},
             data: topWords
         }]
     });
@@ -745,6 +793,13 @@ navBtns.forEach(btn => btn.addEventListener('click', () => {
         if (wordCloudChart) wordCloudChart.resize();
     }, 100);
 }));
+
+document.getElementById('btn-reset-colors').addEventListener('click', () => {
+    GlobalState.customColors = {};
+    initLegend();
+    updateAllChartsColors();
+    processAndRender();
+});
 
 function countBy(dataArray, prop) {
     const counts = {};

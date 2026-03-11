@@ -986,7 +986,8 @@ function renderTable() {
 // EXPORT LOGIC
 // ==========================================
 function exportToExcel() {
-    const data = GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    const scope = document.querySelector('input[name="export-scope"]:checked').value;
+    const data = scope === 'all' ? rawData : GlobalState.getTableFilteredData(GlobalState.getFilteredData());
     
     if (data.length === 0) return alert("Não há dados para exportar com os filtros atuais.");
     
@@ -1005,12 +1006,14 @@ function exportToExcel() {
 }
 
 function exportToPDF() {
-    const data = GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    const scope = document.querySelector('input[name="export-scope"]:checked').value;
+    const data = scope === 'all' ? rawData : GlobalState.getTableFilteredData(GlobalState.getFilteredData());
     
     if (data.length === 0) return alert("Não há dados para exportar com os filtros atuais.");
     
     // Simplificado: abre a janela de impressão focada na tabela com estilo premium
     const printWindow = window.open('', '_blank');
+    const activeText = document.getElementById('modal-active-filters-text').textContent;
     let html = `<html><head><title>Relatório BI PLS</title><style>
         @page { size: landscape; margin: 15mm; }
         body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 0; color: #333; }
@@ -1026,7 +1029,7 @@ function exportToPDF() {
     </style></head><body>`;
     html += `<div class="header">`;
     html += `<div><h1>Relatório Consolidado de Iniciativas</h1></div>`;
-    html += `<div><p>Gerado em: ${new Date().toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'})}</p><p>Total de Registros: ${data.length}</p></div>`;
+    html += `<div><p>Gerado em: ${new Date().toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'})}</p><p>Total de Registros: ${data.length}</p><p style="color:var(--accent); margin-top:4px;">Filtros: ${scope === 'all' ? 'Nenhum (Base Completa)' : activeText}</p></div>`;
     html += `</div>`;
     html += `<table><thead><tr><th style="width:15%">Eixo</th><th style="width:10%">Estado</th><th style="width:15%">Órgão</th><th style="width:20%">Unidade</th><th style="width:40%">Iniciativa Consolidada</th></tr></thead><tbody>`;
     
@@ -1051,7 +1054,26 @@ const modalExport = document.getElementById('modal-export');
 const btnOpenModal = document.getElementById('btn-open-export-modal');
 const btnCloseModal = document.getElementById('btn-close-modal');
 
-if (btnOpenModal) btnOpenModal.addEventListener('click', () => modalExport.style.display = 'flex');
+if (btnOpenModal) btnOpenModal.addEventListener('click', () => {
+    modalExport.style.display = 'flex';
+    let active = Object.entries(GlobalState.filters).filter(([k,v]) => v !== null).map(([k,v]) => `${k}: ${v}`);
+    if (GlobalState.specialFilters.UnidadeGroup) active.push(`Grupo: ${GlobalState.specialFilters.UnidadeGroup}`);
+    for (let k in GlobalState.tableFilters) {
+        if (GlobalState.tableFilters[k]) active.push(`Tabela [${k}]: ${GlobalState.tableFilters[k]}`);
+    }
+    const search = document.getElementById('table-search').value;
+    if (search) active.push(`Busca: ${search}`);
+    
+    const filterWrapper = document.getElementById('export-filters-wrapper');
+    if (active.length > 0) {
+        document.getElementById('modal-active-filters-text').textContent = active.join(' | ');
+        if (filterWrapper) filterWrapper.style.display = 'block';
+        document.querySelector('input[name="export-scope"][value="filtered"]').checked = true;
+    } else {
+        if (filterWrapper) filterWrapper.style.display = 'none';
+        document.querySelector('input[name="export-scope"][value="all"]').checked = true;
+    }
+});
 if (btnCloseModal) btnCloseModal.addEventListener('click', () => modalExport.style.display = 'none');
 window.addEventListener('click', (e) => { if (e.target === modalExport) modalExport.style.display = 'none'; });
 

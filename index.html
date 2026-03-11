@@ -59,19 +59,7 @@
 
         <!-- Main Content Area -->
         <main class="main-content">
-            <!-- Header for Theme Controls -->
-            <header class="top-bar glass-panel">
-                <div class="spacer" style="flex:1;"></div>
-                <div class="theme-controls">
-                    <span class="theme-label">Tema:</span>
-                    <button class="theme-btn" data-theme-val="praia" title="Areia / Praia"><i
-                            data-lucide="sun-dim"></i></button>
-                    <button class="theme-btn" data-theme-val="claro" title="Claro"><i data-lucide="lightbulb"></i></button>
-                    <button class="theme-btn" data-theme-val="escuro" title="Escuro"><i data-lucide="moon"></i></button>
-                    <button class="theme-btn" data-theme-val="contraste" title="Alto Contraste"><i
-                            data-lucide="contrast"></i></button>
-                </div>
-            </header>
+
 
             <!-- Screens Container -->
             <div class="screens-container">
@@ -273,8 +261,19 @@
                 <i data-lucide="palette" class="logo-icon"></i>
                 <h2>Personalizar</h2>
             </div>
-            <p class="legend-desc">Ajuste o tamanho das fontes e neutralize as cores dos eixos estratégicos para o painel.</p>
+            <p class="legend-desc">Ajuste o tema, o foco da visão e neutralize as cores dos eixos estratégicos para todo o painel.</p>
             
+            <div class="theme-control" style="margin-bottom: 20px; text-align: left; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+                <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 12px; text-align: center;">
+                    <i data-lucide="swatch-book" style="width: 14px; height: 14px; vertical-align: middle;"></i> Esquema de Cores (Tema)
+                </label>
+                <div class="theme-controls" style="display: flex; justify-content: center; align-items: center; gap: 6px;">
+                    <button class="theme-btn" data-theme-val="praia" title="Areia / Praia"><i data-lucide="sun-dim"></i></button>
+                    <button class="theme-btn" data-theme-val="claro" title="Claro"><i data-lucide="lightbulb"></i></button>
+                    <button class="theme-btn" data-theme-val="escuro" title="Escuro"><i data-lucide="moon"></i></button>
+                    <button class="theme-btn" data-theme-val="contraste" title="Alto Contraste border"><i data-lucide="contrast"></i></button>
+                </div>
+            </div>
             <div class="font-control" style="margin-bottom: 20px; text-align: left; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
                 <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 12px; text-align: center;">
                     <i data-lucide="zoom-in" style="width: 14px; height: 14px; vertical-align: middle;"></i> Tamanho do Painel (Zoom)
@@ -308,9 +307,22 @@
                 <button class="close-modal" id="btn-close-modal"><i data-lucide="x"></i></button>
             </div>
             <div class="modal-body">
-                <p>Selecione o formato para o relatório (baseado nos dados filtrados atualmente na tela):</p>
+                <p>Selecione o formato e o escopo dos dados para o relatório:</p>
                 
-                <!-- Removido o radio button Base Completa / Dados Filtrados -->
+                <div id="export-filters-wrapper" style="display: none;">
+                    <div class="filter-selection" style="margin-bottom: 10px; display: flex; gap: 10px; justify-content: center;">
+                        <label class="radio-label">
+                            <input type="radio" name="export-scope" value="filtered" checked> <span>Dados Filtrados</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="export-scope" value="all"> <span>Base Completa</span>
+                        </label>
+                    </div>
+                    
+                    <div id="modal-active-filters-box" style="margin-bottom: 20px; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px; font-size: 0.85rem;">
+                        <strong style="color: var(--accent);">Filtros Ativos:</strong> <span id="modal-active-filters-text" style="color: var(--text-main);">Nenhum</span>
+                    </div>
+                </div>
 
                 <div class="export-options" style="margin-top: 20px;">
                     <button class="export-option-btn" id="btn-export-xlsx">

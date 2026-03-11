@@ -43,6 +43,7 @@ const GlobalState = {
     specialFilters: {
         'UnidadeGroup': null // 'MPU' or 'Outros'
     },
+    // Removendo defaultEixoColors para ler direto do CSS (proporciona adaptação temática)
     customColors: {}, // Mapeamento Eixo -> Hex
 
     setFilter(key, value) {
@@ -147,11 +148,43 @@ const GlobalState = {
 // ==========================================
 function getCssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
-function hexToRGBA(hex, alpha) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+    console.error('Error: ' + msg + '\nScript: ' + url + '\nLine: ' + lineNo + '\nColumn: ' + columnNo + '\nStackTrace: ' + (error ? error.stack : ''));
+    if (loadingStatus) {
+        loadingStatus.textContent = "Erro na aplicação: " + msg;
+        loadingStatus.style.color = "#ff4444";
+    }
+    return false;
+};
+
+function hexToRGBA(color, alpha) {
+    if (!color) return `rgba(0,0,0,${alpha})`;
+    
+    // Se já for rgba ou rgb
+    if (color.startsWith('rgb')) {
+        return color.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
+    }
+
+    // Se for hex
+    if (color.startsWith('#')) {
+        const r = parseInt(color.slice(1, 3), 16);
+        const g = parseInt(color.slice(3, 5), 16);
+        const b = parseInt(color.slice(5, 7), 16);
+        return `rgba(${isNaN(r) ? 0 : r}, ${isNaN(g) ? 0 : g}, ${isNaN(b) ? 0 : b}, ${alpha})`;
+    }
+    
+    return `rgba(0,0,0,${alpha})`;
+}
+
+function colorToHex(color) {
+    if (!color) return '#000000';
+    if (color.startsWith('#')) return color;
+    if (color.startsWith('rgb')) {
+        const rgb = color.match(/\d+/g);
+        if (!rgb || rgb.length < 3) return '#000000';
+        return "#" + ((1 << 24) + (parseInt(rgb[0]) << 16) + (parseInt(rgb[1]) << 8) + parseInt(rgb[2])).toString(16).slice(1).toUpperCase();
+    }
+    return '#000000';
 }
 
 function getThemeColors(labels) { 
@@ -171,20 +204,43 @@ function initLegend() {
 
     legendContainer.innerHTML = '';
     eixos.forEach((eixo, idx) => {
+        // Cores padrão para eixos específicos vindas do CSS
+        const cssMap = {
+            'Energia Elétrica': '--color-energia',
+            'Resíduos': '--color-residuos',
+            'Água': '--color-agua'
+        };
+
+        const fallbackHex = {
+            'Energia Elétrica': '#EBC06D',
+            'Resíduos': '#95A5A6',
+            'Água': '#3498DB'
+        };
+
         if (!GlobalState.customColors[eixo]) {
-            GlobalState.customColors[eixo] = defaultColors[idx % defaultColors.length];
+            if (cssMap[eixo]) {
+                let colorVar = getCssVar(cssMap[eixo]);
+                GlobalState.customColors[eixo] = colorVar ? colorVar : fallbackHex[eixo];
+            } else {
+                GlobalState.customColors[eixo] = defaultColors[idx % defaultColors.length];
+            }
         }
 
         const item = document.createElement('div');
         item.className = 'legend-item';
+        // Garantir valor hex para o input type color
+        const hexVal = colorToHex(GlobalState.customColors[eixo]);
         item.innerHTML = `
-            <input type="color" value="${GlobalState.customColors[eixo]}" data-eixo="${eixo}">
+            <input type="color" value="${hexVal}" data-eixo="${eixo}">
             <span title="${eixo}">${eixo}</span>
         `;
         
         const input = item.querySelector('input');
         input.addEventListener('change', (e) => {
             GlobalState.customColors[eixo] = e.target.value;
+            // Para manter a cor persistente MESMO se trocar de tema, vamos marcar como "custo"
+            GlobalState.isCustomized = GlobalState.isCustomized || {};
+            GlobalState.isCustomized[eixo] = true;
             updateAllChartsColors();
             processAndRender();
         });
@@ -267,8 +323,32 @@ async function loadData() {
 // CHARTS LOGIC
 // ==========================================
 function updateAllChartsColors() {
+    // Se trocou o tema, precisamos atualizar as cores que NÃO foram customizadas manualmente
+    const eixos = [...new Set(rawData.map(d => d['Eixo']))].filter(Boolean).sort();
+    const defaultColors = [getCssVar('--chart-color-1'), getCssVar('--chart-color-2'), getCssVar('--chart-color-3'), getCssVar('--chart-color-4'), getCssVar('--chart-color-5')];
+    const cssMap = { 'Energia Elétrica': '--color-energia', 'Resíduos': '--color-residuos', 'Água': '--color-agua' };
+
+    const fallbackHex = { 'Energia Elétrica': '#EBC06D', 'Resíduos': '#95A5A6', 'Água': '#3498DB' };
+
+    eixos.forEach((eixo, idx) => {
+        if (!GlobalState.isCustomized || !GlobalState.isCustomized[eixo]) {
+            if (cssMap[eixo]) {
+                let colorVar = getCssVar(cssMap[eixo]);
+                GlobalState.customColors[eixo] = colorVar ? colorVar : fallbackHex[eixo];
+            } else {
+                GlobalState.customColors[eixo] = defaultColors[idx % defaultColors.length];
+            }
+            // Atualizar o input de cor se existir (Garantir valor hex)
+            const input = document.querySelector(`input[data-eixo="${eixo}"]`);
+            if (input) input.value = colorToHex(GlobalState.customColors[eixo]);
+        }
+    });
+
     for (let key in charts) {
         const chart = charts[key];
+        // Pular se for ECharts (como o heatmap)
+        if (chart.setOption) continue;
+        
         const labels = chart.data.labels;
         const colors = getThemeColors(labels);
         
@@ -765,7 +845,9 @@ function renderTable() {
 // EXPORT LOGIC
 // ==========================================
 function exportToExcel() {
-    const data = GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    const scope = document.querySelector('input[name="export-scope"]:checked').value;
+    const data = scope === 'all' ? rawData : GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    
     if (data.length === 0) return alert("Não há dados para exportar com os filtros atuais.");
     
     const ws = XLSX.utils.json_to_sheet(data);
@@ -773,6 +855,61 @@ function exportToExcel() {
     XLSX.utils.book_append_sheet(wb, ws, "Iniciativas");
     XLSX.writeFile(wb, "BI_PLS_Export.xlsx");
 }
+
+function exportToPDF() {
+    const scope = document.querySelector('input[name="export-scope"]:checked').value;
+    const data = scope === 'all' ? rawData : GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    
+    if (data.length === 0) return alert("Não há dados para exportar com os filtros atuais.");
+    
+    // Simplificado: abre a janela de impressão focada na tabela com estilo premium
+    const printWindow = window.open('', '_blank');
+    let html = `<html><head><title>Relatório BI PLS</title><style>
+        @page { size: landscape; margin: 15mm; }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 0; color: #333; }
+        .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px; }
+        .header h1 { color: #2c3e50; margin: 0; font-size: 24px; }
+        .header p { margin: 0; font-size: 12px; color: #666; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; page-break-inside: auto; }
+        tr { page-break-inside: avoid; page-break-after: auto; }
+        th, td { border: 1px solid #e0e0e0; padding: 10px 8px; text-align: left; }
+        th { background-color: #2c3e50; color: #ffffff; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+        tbody tr:nth-child(even) { background-color: #f8f9fa; }
+        tbody tr:hover { background-color: #f1f5f9; }
+    </style></head><body>`;
+    html += `<div class="header">`;
+    html += `<div><h1>Relatório Consolidado de Iniciativas</h1></div>`;
+    html += `<div><p>Gerado em: ${new Date().toLocaleDateString('pt-BR', {day: '2-digit', month: 'long', year: 'numeric'})}</p><p>Total de Registros: ${data.length}</p></div>`;
+    html += `</div>`;
+    html += `<table><thead><tr><th style="width:15%">Eixo</th><th style="width:10%">Estado</th><th style="width:15%">Órgão</th><th style="width:20%">Unidade</th><th style="width:40%">Iniciativa Consolidada</th></tr></thead><tbody>`;
+    
+    data.forEach(row => {
+        html += `<tr><td>${row['Eixo'] || ''}</td><td>${row['Estado'] || ''}</td><td>${row['Órgão'] || ''}</td><td>${row['Unidade'] || ''}</td><td>${row['Iniciativa consolidada'] || ''}</td></tr>`;
+    });
+    
+    html += `</tbody></table></body></html>`;
+    
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 500);
+}
+
+// ==========================================
+// MODAL CONTROL
+// ==========================================
+const modalExport = document.getElementById('modal-export');
+const btnOpenModal = document.getElementById('btn-open-export-modal');
+const btnCloseModal = document.getElementById('btn-close-modal');
+
+if (btnOpenModal) btnOpenModal.addEventListener('click', () => modalExport.style.display = 'flex');
+if (btnCloseModal) btnCloseModal.addEventListener('click', () => modalExport.style.display = 'none');
+window.addEventListener('click', (e) => { if (e.target === modalExport) modalExport.style.display = 'none'; });
+
+document.getElementById('btn-export-xlsx').addEventListener('click', () => { exportToExcel(); modalExport.style.display = 'none'; });
+document.getElementById('btn-export-pdf').addEventListener('click', () => { exportToPDF(); modalExport.style.display = 'none'; });
 
 // ==========================================
 // EVENT LISTENERS
@@ -783,12 +920,15 @@ document.getElementById('btn-page-next').addEventListener('click', () => {
     if (GlobalState.pagination.currentPage < Math.ceil(fullData.length / GlobalState.pagination.pageSize)) { GlobalState.pagination.currentPage++; renderTable(); } 
 });
 
-document.getElementById('btn-export-csv').addEventListener('click', exportToExcel);
 btnClearFilters.addEventListener('click', () => {
     GlobalState.specialFilters.UnidadeGroup = null;
     document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
     GlobalState.clearGlobalFilters();
 });
+
+if (document.getElementById('btn-export-csv')) {
+    document.getElementById('btn-export-csv').addEventListener('click', exportToExcel);
+}
 
 document.querySelectorAll('.quick-btn').forEach(btn => btn.addEventListener('click', () => {
     const group = btn.dataset.filterUnit;

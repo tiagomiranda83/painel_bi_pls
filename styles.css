@@ -6,14 +6,16 @@
     --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
     --text-main: #2c3e50;
     --text-muted: #546e7a;
-    --accent: #00838f;
-    /* Ocean blue/teal */
-    --accent-hover: #006064;
-    --chart-color-1: #00838f;
-    --chart-color-2: #26a69a;
-    --chart-color-3: #80cbc4;
-    --chart-color-4: #e0f2f1;
-    --chart-color-5: #004d40;
+    --accent: #2c3e50; /* Slate Blue mais neutro */
+    --accent-hover: #1a252f;
+    --chart-color-1: #3498DB; /* Azul */
+    --chart-color-2: #EBC06D; /* Amarelo/Dourado */
+    --chart-color-3: #95A5A6; /* Cinza */
+    --chart-color-4: #E74C3C; /* Vermelho/Coral */
+    --chart-color-5: #1ABC9C; /* Turquesa */
+    --color-energia: #EBC06D;
+    --color-residuos: #95A5A6;
+    --color-agua: #3498DB;
     --font-heading: 'Outfit', sans-serif;
     --font-body: 'Inter', sans-serif;
 }
@@ -32,6 +34,9 @@
     --chart-color-3: #60a5fa;
     --chart-color-4: #93c5fd;
     --chart-color-5: #1e3a8a;
+    --color-energia: #EBC06D;
+    --color-residuos: #95A5A6;
+    --color-agua: #3498DB;
 }
 
 [data-theme="escuro"] {
@@ -48,6 +53,9 @@
     --chart-color-3: #0ea5e9;
     --chart-color-4: #bae6fd;
     --chart-color-5: #0369a1;
+    --color-energia: #F3BA4B; /* Mais vibrante no escuro */
+    --color-residuos: #7F8C8D;
+    --color-agua: #1D80C4;
 }
 
 [data-theme="contraste"] {
@@ -60,10 +68,13 @@
     --accent: #ffff00;
     --accent-hover: #ffffff;
     --chart-color-1: #ffff00;
-    --chart-color-2: #ffffff;
-    --chart-color-3: #cccccc;
-    --chart-color-4: #999999;
-    --chart-color-5: #666666;
+    --chart-color-2: #00ff00; /* Adicionando cores mais distintas para contraste */
+    --chart-color-3: #00ffff;
+    --chart-color-4: #ff00ff;
+    --chart-color-5: #ffffff;
+    --color-energia: #FFFF00;
+    --color-residuos: #FFFFFF;
+    --color-agua: #00FFFF;
 }
 
 * {
@@ -794,6 +805,125 @@ tbody tr:hover {
     .geo-layout {
         grid-template-columns: 1fr;
     }
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+    width: 90%;
+    max-width: 500px;
+    padding: 30px;
+    position: relative;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border-glass);
+}
+
+.modal-body p {
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.export-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.export-option-btn {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 16px 24px;
+    border: 1px solid var(--border-glass);
+    background: var(--bg-glass);
+    color: var(--text-main);
+    border-radius: 12px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.export-option-btn:hover {
+    background: var(--accent);
+    color: var(--bg-main);
+    transform: translateY(-2px);
+}
+
+.export-option-btn i {
+    width: 24px;
+    height: 24px;
+}
+
+.close-modal {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 5px;
+    transition: color 0.2s ease;
+}
+
+.close-modal:hover {
+    color: var(--accent);
+}
+
+.modal-note {
+    margin-top: 20px;
+    font-size: 0.8rem;
+    font-style: italic;
+    text-align: center;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 8px 16px;
+    background: var(--bg-main);
+    border: 1px solid var(--border-glass);
+    border-radius: 20px;
+    transition: all 0.2s ease;
+}
+
+.radio-label:has(input:checked) {
+    background: var(--accent);
+    color: var(--bg-main);
+    border-color: var(--accent);
+}
+
+.radio-label input {
+    cursor: pointer;
+}
+
+/* Fix for theme button visibility in specific themes */
+[data-theme="praia"] .theme-btn[data-theme-val="praia"] {
+    background: var(--accent);
+    color: var(--bg-main);
+    border-color: var(--accent);
 }
 
 /* Responsive adjustments */

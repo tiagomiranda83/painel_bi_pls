@@ -39,18 +39,14 @@ Foco no conteúdo das iniciativas.
 Exploração territorial.
 *   **Mapa Interativo**: Clique em qualquer estado.
 *   **Painel de Detalhes**: Ao clicar no mapa, o painel lateral de "Detalhes Selecionados" abre, mostrando as iniciativas daquele estado agrupadas por Eixo (com as suas cores customizadas!).
-*   **Interligação**: Clique em um item do detalhe geográfico para ser levado diretamente à aba de "Dados Brutos" já filtrada para aquele tema.
+*   **Interligação**: O painel geográfico agora atua como uma lente de aumento na aba e mantém fatias separadas.
 
 ### 💡 Aba: Insights
 Onde a estratégia acontece.
 *   **Pareto por Órgão**: Gráfico de barras que mostra os maiores detentores de iniciativas, ordenados do maior para o menor.
 *   **Matriz de Calor (Heatmap)**: Um cruzamento visual entre Eixo e Órgão. Quanto mais "brilhante" a cor (sua cor escolhida na legenda), maior o volume de iniciativas naquele cruzamento.
 
-### 📋 Aba: Relatórios
-Onde você vê o texto original e gera seus documentos.
-*   **Busca Global**: Digite qualquer termo para filtrar a tabela.
-*   **Filtros de Coluna**: Cada coluna tem seu próprio filtro independente.
-*   **Gerar Relatório**: Clique para abrir o modal de exportação. Você pode escolher entre **Excel (XLSX)** ou **PDF** e decidir se quer exportar apenas o que está vendo (**Dados Filtrados**) ou a **Base Completa**.
+
 
 ---
 

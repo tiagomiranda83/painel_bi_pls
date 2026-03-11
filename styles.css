@@ -430,12 +430,13 @@ h6 {
 /* Screen 1: Cover Layout */
 .cover-layout {
     display: flex;
+    flex-wrap: wrap;
     gap: 24px;
     min-height: calc(100vh - 120px);
 }
 
 .cover-text {
-    flex: 0 0 40%;
+    flex: 1 1 450px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -463,7 +464,7 @@ h6 {
 
 .kpi-cards {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
     margin-top: 30px;
 }
@@ -549,7 +550,7 @@ h6 {
 }
 
 .cover-charts {
-    flex: 1;
+    flex: 2 1 500px;
     display: flex;
     flex-direction: column;
     gap: 24px;
@@ -585,11 +586,21 @@ h6 {
 }
 
 .chart-grid.two-cols {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
 }
 
 .chart-grid.geo-cols {
-    grid-template-columns: 2fr 1fr;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+.chart-grid.geo-cols > div:first-child {
+    flex: 2 1 600px;
+}
+
+.chart-grid.geo-cols > div:last-child {
+    flex: 1 1 300px;
 }
 
 .canvas-wrapper {
@@ -1001,6 +1012,36 @@ tbody tr:hover {
     font-size: 0.8rem;
     padding: 10px;
     justify-content: center;
+}
+
+/* Custom Toggle Switch CSS */
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: var(--border-glass);
+    transition: .4s;
+    border-radius: 24px;
+}
+.switch .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px; width: 18px;
+    left: 3px; bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+.switch input:checked + .slider {
+    background-color: var(--accent);
+}
+.switch input:checked + .slider:before {
+    transform: translateX(20px);
 }
 
 /* Responsive adjustments */

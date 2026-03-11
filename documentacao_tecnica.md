@@ -22,7 +22,6 @@ O dashboard utiliza um objeto literal `GlobalState` no `app.js` para centralizar
 ### Propriedades Principais:
 - `customColors`: Um mapa dinâmico `Eixo -> Hexadecimal`, alimentado pela sidebar de legenda e sincronizado com as cores de tema.
 - `isCustomized`: Registra quais eixos tiveram cores alteradas manualmente para garantir persistência entre temas.
-- `pagination`: Controla a exibição dos registros na aba de Relatórios.
 
 ### Métodos de Reação:
 - `setFilter(key, value)`: Altera um filtro, remove a seleção se clicado novamente e dispara a função `processAndRender()`.
@@ -50,8 +49,9 @@ O painel utiliza uma abordagem híbrida com duas das melhores bibliotecas do mer
 A grande inovação da v03 é o sistema de **Legenda Permanente**.
 
 1.  **Cores Padrão Dinâmicas**: No `app.js`, os eixos específicos (Energia Elétrica, Água, Resíduos) buscam suas cores diretamente das variáveis CSS (`--color-energia`, etc.), permitindo que o tom mude suavemente entre os temas Escuro, Claro e Praia.
-2.  **Persistência Manual**: Se o usuário ajustar um picker, o sistema marca esse eixo como "customizado" e ignora as trocas de tema para aquela cor específica até que o usuário resete ou feche a sessão.
-3.  **Propagação**: A função `updateAllChartsColors()` sincroniza essa lógica em todos os motores (Chart.js e ECharts).
+2. **Mecanismo de Resiliência (Fallback)**: Foi implementado um sistema de conversão dupla (RGB <-> HEX) no `app.js` (`hexToRGBA`, `colorToHex`) e uma trava estática hardcoded. Isso previne race conditions frequentes onde o navegador tentava ler as variáveis CSS antes de sua inicialização completa, o que resultava em gráficos pretos silenciosos.
+3. **Persistência Manual**: Se o usuário ajustar um picker, o sistema marca esse eixo como "customizado" e ignora as trocas de tema para aquela cor específica.
+4. **Propagação**: A função `updateAllChartsColors()` sincroniza essa lógica em todos os motores, além de ignorar instâncias que não possuem o método adequado (`chart.setOption`), cortando conflitos entre Chart.js e ECharts.
 
 ---
 
@@ -60,7 +60,7 @@ O fluxo de dados segue este pipeline:
 1.  **Leitura**: `XLSX.read()` converte o Excel para JSON.
 2.  **Filtragem**: `getFilteredData()` aplica os filtros cumulativos (`filter()` nativo do JS).
 3.  **Agregação**: `countBy()` gera as frequências para os gráficos.
-4.  **Relatórios e Exportação**: O sistema gerencia um modal de exportação avançado via `exportToExcel` (usando a lib XLSX) e `exportToPDF` (usando motor de impressão estilizado), permitindo escolha entre dados filtrados ou base total.
+
 5.  **Renderização**: As funções específicas (ex: `renderMap`, `renderPareto`) recebem os dados filtrados e atualizam os canvases/divs.
 
 ---

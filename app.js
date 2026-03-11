@@ -33,7 +33,6 @@ const GlobalState = {
         'Estado': '',
         'Órgão': '',
         'Unidade': '',
-        'Iniciativa BRUTA': '',
         'Iniciativa consolidada': ''
     },
     pagination: {
@@ -45,6 +44,9 @@ const GlobalState = {
     },
     // Removendo defaultEixoColors para ler direto do CSS (proporciona adaptação temática)
     customColors: {}, // Mapeamento Eixo -> Hex
+    fontSize: 12,
+    zoomLevel: 100,
+    showLabels: true,
 
     setFilter(key, value) {
         if (this.filters[key] === value) {
@@ -320,6 +322,25 @@ async function loadData() {
 }
 
 // ==========================================
+// REGISTRO GLOBAL E CONFIG PLUGINS CHARTJS
+// ==========================================
+Chart.register(ChartDataLabels);
+Chart.defaults.set('plugins.datalabels', {
+    color: (context) => {
+        const isDark = document.documentElement.getAttribute('data-theme') === 'escuro' || document.documentElement.getAttribute('data-theme') === 'contraste';
+        return isDark ? '#ffffff' : '#2c3e50';
+    },
+    font: { weight: 'bold', size: () => GlobalState.fontSize },
+    formatter: Math.round,
+    display: (context) => GlobalState.showLabels && context.dataset.data[context.dataIndex] > 0
+});
+
+Object.values(charts).forEach(c => {
+    if (c.destroy) c.destroy();
+});
+charts = {};
+
+// ==========================================
 // CHARTS LOGIC
 // ==========================================
 function updateAllChartsColors() {
@@ -353,16 +374,23 @@ function updateAllChartsColors() {
         const colors = getThemeColors(labels);
         
         chart.data.datasets.forEach(dataset => {
-            // Se o dataset tiver label próprio (como nos empilhados), usa a cor do label do dataset
-            if (dataset.label && GlobalState.customColors[dataset.label]) {
+            if (key === 'coverEixos' || key === 'fullEixos') {
+                // A cor de cada fatia ou barra depende especificamente da label e da escala estratégica
+                dataset.backgroundColor = labels.map(label => GlobalState.customColors[label] || colors[0]);
+            } else if (key === 'fullUnidades' || key === 'pareto') {
+                // Evitar escala arco-íris nesses gráficos para não confundir com os Eixos. Cor neutra unificada.
+                dataset.backgroundColor = getCssVar('--accent');
+            } else if (dataset.label && GlobalState.customColors[dataset.label]) {
+                // Gráficos empilhados usam o dataset.label como nome de Eixo
                 dataset.backgroundColor = GlobalState.customColors[dataset.label];
             } else {
+                // Outros recebem paleta rotacionada
                 dataset.backgroundColor = colors;
             }
             dataset.borderColor = getCssVar('--bg-main');
         });
-        if (chart.options.plugins?.legend?.labels) chart.options.plugins.legend.labels.color = getCssVar('--text-main');
-        if (chart.options.scales?.x) {
+        if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) chart.options.plugins.legend.labels.color = getCssVar('--text-main');
+        if (chart.options.scales && chart.options.scales.x) {
             chart.options.scales.x.ticks.color = getCssVar('--text-muted');
             chart.options.scales.x.grid.color = getCssVar('--border-glass');
         }
@@ -430,12 +458,9 @@ function createOrUpdateChart(canvasId, type, labels, data, chartKey, filterField
                     GlobalState.setFilter(filterField, label);
                 }
             },
-            onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
             plugins: {
                 legend: { 
-                    display: false, // Legenda agora é permanente na sidebar direita
-                    position: 'bottom', 
-                    labels: { color: getCssVar('--text-main'), font: { family: getCssVar('--font-body'), size: 10 }, boxWidth: 12 } 
+                    display: false
                 },
                 tooltip: {
                     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -447,10 +472,36 @@ function createOrUpdateChart(canvasId, type, labels, data, chartKey, filterField
                     displayColors: true,
                     boxPadding: 6,
                     usePointStyle: true
+                },
+                datalabels: {
+                    color: (context) => {
+                        if (axisConf.plugins && axisConf.plugins.datalabels && axisConf.plugins.datalabels.color) {
+                            return axisConf.plugins.datalabels.color;
+                        }
+                        const isDark = document.documentElement.getAttribute('data-theme') === 'escuro' || document.documentElement.getAttribute('data-theme') === 'contraste';
+                        return isDark ? '#ffffff' : '#2c3e50';
+                    },
+                    font: { weight: 'bold', size: () => GlobalState.fontSize },
+                    formatter: Math.round,
+                    display: (context) => {
+                        if (!GlobalState.showLabels) return false;
+                        const val = context.dataset.data[context.dataIndex];
+                        if (!val || val <= 0) return false;
+                        
+                        // Ocultação inteligente para modo banca/empilhado
+                        if (axisConf.scales && axisConf.scales.x && axisConf.scales.x.stacked) {
+                            if (val < 5) return false; // muito espremido
+                        }
+                        return true;
+                    },
+                    anchor: (axisConf.plugins && axisConf.plugins.datalabels && axisConf.plugins.datalabels.anchor) || 'center',
+                    align: (axisConf.plugins && axisConf.plugins.datalabels && axisConf.plugins.datalabels.align) || 'center'
                 }
             },
-            ...axisConf
-        }
+            scales: axisConf.scales || {},
+            indexAxis: axisConf.indexAxis || 'x'
+        },
+        plugins: [ChartDataLabels]
     };
     
 
@@ -497,9 +548,27 @@ function processAndRender() {
             x: { stacked: true, ticks: { color: getCssVar('--text-muted') }, grid: { color: getCssVar('--border-glass') } },
             y: { stacked: true, ticks: { color: getCssVar('--text-muted') }, grid: { color: getCssVar('--border-glass') } }
         },
-        plugins: { legend: { display: false } }
+        plugins: { 
+            legend: { display: false },
+            datalabels: {
+                anchor: 'center',
+                align: 'center',
+                color: '#ffffff'
+            }
+        }
     };
-    const horizontalBarOptions = { indexAxis: 'y', scales: barOptions.scales, plugins: barOptions.plugins };
+    const horizontalBarOptions = { 
+        indexAxis: 'y', 
+        scales: barOptions.scales, 
+        plugins: { 
+            ...barOptions.plugins,
+            datalabels: {
+                anchor: 'end',
+                align: 'start',
+                color: '#ffffff'
+            }
+        }
+    };
 
     const barEixosColors = countEixos.map(x => GlobalState.customColors[x[0]] || getCssVar('--accent'));
     const doughnutEixosColors = countEixos.slice(0, 5).map(x => GlobalState.customColors[x[0]] || getCssVar('--accent'));
@@ -512,7 +581,10 @@ function processAndRender() {
         ...horizontalBarOptions,
         customDatasetColors: barEixosColors
     });
-    createOrUpdateChart('chart-full-unidades', 'bar', countUnidades.slice(0, 10).map(x => x[0]), countUnidades.slice(0, 10).map(x => x[1]), 'fullUnidades', 'Unidade', horizontalBarOptions);
+    createOrUpdateChart('chart-full-unidades', 'bar', countUnidades.slice(0, 10).map(x => x[0]), countUnidades.slice(0, 10).map(x => x[1]), 'fullUnidades', 'Unidade', { 
+        ...horizontalBarOptions,
+        customDatasetColors: getCssVar('--accent')
+    });
 
     renderMap(countEstados);
     renderWordCloud(data);
@@ -559,6 +631,16 @@ function renderPareto(data) {
                 title: { display: true, text: 'Qtd Iniciativas' }, 
                 grid: { color: getCssVar('--border-glass') } 
             }
+        },
+        plugins: {
+            datalabels: {
+                anchor: 'end',
+                align: 'end',
+                color: (context) => {
+                    const isDark = document.documentElement.getAttribute('data-theme') === 'escuro' || document.documentElement.getAttribute('data-theme') === 'contraste';
+                    return isDark ? '#ffffff' : '#2c3e50';
+                }
+            }
         }
     };
 
@@ -595,7 +677,17 @@ function renderHeatmap(data) {
             
             heatmapData.push({
                 value: [eixoIdx, orgIdx, val || '-'],
-                itemStyle: { color: hexToRGBA(eixoColor, alpha) }
+                itemStyle: { color: hexToRGBA(eixoColor, alpha) },
+                label: {
+                    show: GlobalState.showLabels && val > 0,
+                    textStyle: {
+                        color: getCssVar('--text-main'),
+                        fontSize: GlobalState.fontSize,
+                        fontWeight: 'bold',
+                        textShadowColor: getCssVar('--bg-glass'),
+                        textShadowBlur: 2
+                    }
+                }
             });
         });
     });
@@ -701,13 +793,7 @@ function renderWordCloud(data) {
         if (!el) return;
         wordCloudChart = echarts.init(el);
         window.addEventListener('resize', () => wordCloudChart && wordCloudChart.resize());
-        wordCloudChart.on('click', (params) => {
-            const term = params.name;
-            GlobalState.setTableFilter('Iniciativa BRUTA', term);
-            navBtns.forEach(b => { if (b.getAttribute('data-target') === 'screen-data') b.click(); });
-            document.getElementById('table-search').value = term;
-            renderTable();
-        });
+        // Interação de tabela removida. A nuvem serve apenas a critério informativo visual nesta versão.
     }
 
     const stopWords = ['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'uma', 'os', 'no', 'se', 'na', 'por', 'mais', 'as', 'dos', 'como', 'mas', 'foi', 'ao', 'ele', 'das', 'tem', 'à', 'seu', 'sua', 'ou', 'ser', 'quando', 'muito', 'há', 'nos', 'já', 'está', 'eu', 'também', 'só', 'pelo', 'pela', 'até', 'isso', 'ela', 'entre', 'era', 'depois', 'sem', 'mesmo', 'aos', 'ter', 'seus', 'quem', 'nas', 'me', 'esse', 'eles', 'estão', 'você', 'tinha', 'foram', 'essa', 'num', 'nem', 'suas', 'meu', 'às', 'minha', 'têm', 'numa', 'pelos', 'elas', 'havia', 'seja', 'qual', 'será', 'nós', 'tenho', 'lhe', 'deles', 'essas', 'esses', 'pelas', 'este', 'fosse', 'dele', 'tu', 'te', 'vocês', 'vos', 'lhes', 'meus', 'minhas', 'teu', 'tua', 'teus', 'tuas', 'nosso', 'nossa', 'nossos', 'nossas', 'dela', 'delas', 'esta', 'estes', 'estas', 'aquele', 'aquela', 'aqueles', 'aquelas', 'isto', 'aquilo', 'estou', 'estamos', 'estive', 'esteve', 'estivemos', 'estiveram', 'estava', 'estávamos', 'estavam', 'estivera', 'estivéramos', 'esteja', 'estejamos', 'estejam', 'estivesse', 'estivéssemos', 'estivessem', 'estiver', 'estivermos', 'estiverem', 'hei', 'há', 'havemos', 'hão', 'houve', 'houvemos', 'houveram', 'houvera', 'houvéramos', 'haja', 'hajamos', 'hajam', 'houvesse', 'houvéssemos', 'houvessem', 'houver', 'houvermos', 'houverem', 'houverei', 'houverá', 'houveremos', 'houverão', 'houveria', 'houveríamos', 'houveriam', 'sou', 'somos', 'são', 'era', 'éramos', 'eram', 'fui', 'foi', 'fomos', 'foram', 'fora', 'fôramos', 'seja', 'sejamos', 'sejam', 'fosse', 'fôssemos', 'fossem', 'for', 'formos', 'forem', 'serei', 'será', 'seremos', 'serão', 'seria', 'seríamos', 'seriam', 'tenho', 'tem', 'temos', 'tém', 'tinha', 'tínhamos', 'tinham', 'tive', 'teve', 'tivemos', 'tiveram', 'tivera', 'tivéramos', 'tenha', 'tenhamos', 'tenham', 'tivesse', 'tivéssemos', 'tivessem', 'tiver', 'tivermos', 'tiverem', 'terei', 'terá', 'teremos', 'terão', 'teria', 'teríamos', 'teriam'];
@@ -813,6 +899,61 @@ function updateGeoDetails(uf, stateName) {
     });
 }
 
+
+
+const btnFontMinus = document.getElementById('btn-font-minus');
+const btnFontPlus = document.getElementById('btn-font-plus');
+const fontSizeVal = document.getElementById('font-size-val');
+
+if (btnFontPlus && btnFontMinus) {
+    btnFontPlus.addEventListener('click', () => {
+        GlobalState.zoomLevel = Math.min(150, GlobalState.zoomLevel + 5);
+        applyGlobalZoom();
+    });
+    btnFontMinus.addEventListener('click', () => {
+        GlobalState.zoomLevel = Math.max(50, GlobalState.zoomLevel - 5);
+        applyGlobalZoom();
+    });
+}
+
+function applyGlobalZoom() {
+    fontSizeVal.textContent = GlobalState.zoomLevel + '%';
+    // O recurso CSS zoom atende bem à maioria dos casos e aumenta tudo visualmente
+    document.body.style.zoom = (GlobalState.zoomLevel / 100).toString();
+    
+    // Atualiza a fonte base dos labels proporcionalmente para garantir que o DataLabels e o ECharts acompanhem a clareza
+    GlobalState.fontSize = Math.round(12 * (GlobalState.zoomLevel / 100));
+    updateAllChartsFontSize();
+}
+
+function updateAllChartsFontSize() {
+    // Atualiza ChartJS
+    for (let key in charts) {
+        const chart = charts[key];
+        if (chart.setOption) continue;
+        chart.update(); // O ChartJS vai repuxar dinamicamente pela query do fontSize no datalabels
+    }
+    // Atualiza ECharts
+    if (mapChart) {
+        mapChart.setOption({
+            series: [{ label: { show: GlobalState.showLabels, textStyle: { fontSize: GlobalState.fontSize } } }]
+        });
+    }
+    if (heatmapChart) {
+        // Usa Merge raso do ECharts para não reconstruir o canvas do zero e evitar call stack loops
+        heatmapChart.setOption({
+            series: [{
+                label: {
+                    show: GlobalState.showLabels,
+                    textStyle: { fontSize: GlobalState.fontSize } 
+                }
+            }]
+        });
+    }
+}
+
+
+
 // ==========================================
 // TABLE & PAGINATION
 // ==========================================
@@ -833,7 +974,7 @@ function renderTable() {
     tableBody.innerHTML = '';
     dataToRender.forEach(row => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${row['Eixo'] || '-'}</td><td>${row['Estado'] || '-'}</td><td>${row['Órgão'] || '-'}</td><td>${row['Unidade'] || '-'}</td><td>${row['Iniciativa BRUTA'] || '-'}</td><td>${row['Iniciativa consolidada'] || '-'}</td>`;
+        tr.innerHTML = `<td>${row['Eixo'] || '-'}</td><td>${row['Estado'] || '-'}</td><td>${row['Órgão'] || '-'}</td><td>${row['Unidade'] || '-'}</td><td>${row['Iniciativa consolidada'] || '-'}</td>`;
         tableBody.appendChild(tr);
     });
 
@@ -845,20 +986,26 @@ function renderTable() {
 // EXPORT LOGIC
 // ==========================================
 function exportToExcel() {
-    const scope = document.querySelector('input[name="export-scope"]:checked').value;
-    const data = scope === 'all' ? rawData : GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    const data = GlobalState.getTableFilteredData(GlobalState.getFilteredData());
     
     if (data.length === 0) return alert("Não há dados para exportar com os filtros atuais.");
     
-    const ws = XLSX.utils.json_to_sheet(data);
+    const exportData = data.map(row => ({
+        'Eixo': row['Eixo'] || '',
+        'Estado': row['Estado'] || '',
+        'Órgão': row['Órgão'] || '',
+        'Unidade': row['Unidade'] || '',
+        'Iniciativa Consolidada': row['Iniciativa consolidada'] || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Iniciativas");
     XLSX.writeFile(wb, "BI_PLS_Export.xlsx");
 }
 
 function exportToPDF() {
-    const scope = document.querySelector('input[name="export-scope"]:checked').value;
-    const data = scope === 'all' ? rawData : GlobalState.getTableFilteredData(GlobalState.getFilteredData());
+    const data = GlobalState.getTableFilteredData(GlobalState.getFilteredData());
     
     if (data.length === 0) return alert("Não há dados para exportar com os filtros atuais.");
     
@@ -898,7 +1045,7 @@ function exportToPDF() {
 }
 
 // ==========================================
-// MODAL CONTROL
+// MODAL CONTROL & EVENTS
 // ==========================================
 const modalExport = document.getElementById('modal-export');
 const btnOpenModal = document.getElementById('btn-open-export-modal');
@@ -911,14 +1058,14 @@ window.addEventListener('click', (e) => { if (e.target === modalExport) modalExp
 document.getElementById('btn-export-xlsx').addEventListener('click', () => { exportToExcel(); modalExport.style.display = 'none'; });
 document.getElementById('btn-export-pdf').addEventListener('click', () => { exportToPDF(); modalExport.style.display = 'none'; });
 
-// ==========================================
-// EVENT LISTENERS
-// ==========================================
 document.getElementById('btn-page-prev').addEventListener('click', () => { if (GlobalState.pagination.currentPage > 1) { GlobalState.pagination.currentPage--; renderTable(); } });
 document.getElementById('btn-page-next').addEventListener('click', () => { 
     const fullData = GlobalState.getTableFilteredData(GlobalState.getFilteredData());
     if (GlobalState.pagination.currentPage < Math.ceil(fullData.length / GlobalState.pagination.pageSize)) { GlobalState.pagination.currentPage++; renderTable(); } 
 });
+
+document.querySelectorAll('.col-filter').forEach(input => input.addEventListener('input', (e) => GlobalState.setTableFilter(e.target.dataset.col, e.target.value)));
+document.getElementById('table-search').addEventListener('input', () => renderTable());
 
 btnClearFilters.addEventListener('click', () => {
     GlobalState.specialFilters.UnidadeGroup = null;
@@ -926,9 +1073,6 @@ btnClearFilters.addEventListener('click', () => {
     GlobalState.clearGlobalFilters();
 });
 
-if (document.getElementById('btn-export-csv')) {
-    document.getElementById('btn-export-csv').addEventListener('click', exportToExcel);
-}
 
 document.querySelectorAll('.quick-btn').forEach(btn => btn.addEventListener('click', () => {
     const group = btn.dataset.filterUnit;
@@ -944,8 +1088,7 @@ document.querySelectorAll('.quick-btn').forEach(btn => btn.addEventListener('cli
     processAndRender();
 }));
 
-document.querySelectorAll('.col-filter').forEach(input => input.addEventListener('input', (e) => GlobalState.setTableFilter(e.target.dataset.col, e.target.value)));
-document.getElementById('table-search').addEventListener('input', () => renderTable());
+
 
 themeBtns.forEach(btn => btn.addEventListener('click', () => { htmlEl.setAttribute('data-theme', btn.dataset.themeVal); updateAllChartsColors(); if (mapChart) updateMapColors(); }));
 navBtns.forEach(btn => btn.addEventListener('click', () => {

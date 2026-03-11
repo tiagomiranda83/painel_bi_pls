@@ -17,6 +17,7 @@
 
     <!-- Script de Leitura XLSX e Gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud/dist/echarts-wordcloud.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -125,7 +126,7 @@
                         </div>
                         <div class="cover-charts">
                             <div class="chart-container glass-panel">
-                                <h3>Iniciativas por Eixo (Top 5)</h3>
+                                <h3>Iniciativas por Eixo</h3>
                                 <div class="canvas-wrapper">
                                     <canvas id="chart-cover-eixos"></canvas>
                                 </div>
@@ -183,7 +184,7 @@
                             </div>
                         </div>
                         <div class="chart-container glass-panel">
-                            <h3>Top 10 Unidades / Órgãos</h3>
+                            <h3>Ranking Órgãos/Unidades</h3>
                             <div class="canvas-wrapper-xl">
                                 <canvas id="chart-full-unidades"></canvas>
                             </div>
@@ -215,7 +216,6 @@
 
                 </section>
 
-
                 <!-- Screen 4: Base de Dados -->
                 <section id="screen-data" class="screen">
                     <div class="glass-panel screen-header">
@@ -229,8 +229,7 @@
                             </button>
                         </div>
                         <div class="table-controls">
-                            <input type="text" id="table-search" placeholder="Buscar em qualquer coluna..."
-                                class="glass-input">
+                            <input type="text" id="table-search" placeholder="Buscar em qualquer coluna..." class="glass-input">
                             <span id="table-count">Mostrando 0 registros</span>
                         </div>
                     </div>
@@ -242,22 +241,14 @@
                                     <th>Estado</th>
                                     <th>Órgão</th>
                                     <th>Unidade</th>
-                                    <th>Iniciativa Bruta</th>
                                     <th>Iniciativa Consolidada</th>
                                 </tr>
                                 <tr class="filter-row">
-                                    <th><input type="text" class="col-filter" data-col="Eixo"
-                                            placeholder="Filtrar Eixo..."></th>
-                                    <th><input type="text" class="col-filter" data-col="Estado"
-                                            placeholder="Filtrar Estado..."></th>
-                                    <th><input type="text" class="col-filter" data-col="Órgão"
-                                            placeholder="Filtrar Órgão..."></th>
-                                    <th><input type="text" class="col-filter" data-col="Unidade"
-                                            placeholder="Filtrar Unidade..."></th>
-                                    <th><input type="text" class="col-filter" data-col="Iniciativa BRUTA"
-                                            placeholder="Filtrar Iniciativa Bruta..."></th>
-                                    <th><input type="text" class="col-filter" data-col="Iniciativa consolidada"
-                                            placeholder="Filtrar Consolidada..."></th>
+                                    <th><input type="text" class="col-filter" data-col="Eixo" placeholder="Filtrar Eixo..."></th>
+                                    <th><input type="text" class="col-filter" data-col="Estado" placeholder="Filtrar Estado..."></th>
+                                    <th><input type="text" class="col-filter" data-col="Órgão" placeholder="Filtrar Órgão..."></th>
+                                    <th><input type="text" class="col-filter" data-col="Unidade" placeholder="Filtrar Unidade..."></th>
+                                    <th><input type="text" class="col-filter" data-col="Iniciativa consolidada" placeholder="Filtrar Consolidada..."></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -280,9 +271,24 @@
         <aside id="legend-sidebar" class="right-sidebar glass-panel">
             <div class="sidebar-header">
                 <i data-lucide="palette" class="logo-icon"></i>
-                <h2>Legenda</h2>
+                <h2>Personalizar</h2>
             </div>
-            <p class="legend-desc">Customize as cores dos eixos estratégicos para todo o painel.</p>
+            <p class="legend-desc">Ajuste o tamanho das fontes e neutralize as cores dos eixos estratégicos para o painel.</p>
+            
+            <div class="font-control" style="margin-bottom: 20px; text-align: left; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+                <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 12px; text-align: center;">
+                    <i data-lucide="zoom-in" style="width: 14px; height: 14px; vertical-align: middle;"></i> Tamanho do Painel (Zoom)
+                </label>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 15px;">
+                    <button id="btn-font-minus" style="width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--bg-glass); cursor: pointer; color: var(--text-main); box-shadow: var(--shadow-glass); display: flex; align-items: center; justify-content: center;"><i data-lucide="minus" style="width: 16px; height: 16px;"></i></button>
+                    <span id="font-size-val" style="font-weight: bold; font-size: 1rem; color: var(--text-main); min-width: 45px; text-align: center;">100%</span>
+                    <button id="btn-font-plus" style="width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--bg-glass); cursor: pointer; color: var(--text-main); box-shadow: var(--shadow-glass); display: flex; align-items: center; justify-content: center;"><i data-lucide="plus" style="width: 16px; height: 16px;"></i></button>
+                </div>
+            </div>
+
+
+
+
             <div id="legend-controls" class="legend-list">
                 <!-- Populated by JS -->
             </div>
@@ -293,7 +299,7 @@
             </div>
         </aside>
     </div>
-    
+
     <!-- Modal de Exportação -->
     <div id="modal-export" class="modal-overlay" style="display: none;">
         <div class="modal-content glass-panel">
@@ -302,18 +308,11 @@
                 <button class="close-modal" id="btn-close-modal"><i data-lucide="x"></i></button>
             </div>
             <div class="modal-body">
-                <p>Selecione o formato e o escopo dos dados para o relatório:</p>
+                <p>Selecione o formato para o relatório (baseado nos dados filtrados atualmente na tela):</p>
                 
-                <div class="filter-selection" style="margin-bottom: 20px; display: flex; gap: 10px; justify-content: center;">
-                    <label class="radio-label">
-                        <input type="radio" name="export-scope" value="filtered" checked> <span>Dados Filtrados</span>
-                    </label>
-                    <label class="radio-label">
-                        <input type="radio" name="export-scope" value="all"> <span>Base Completa</span>
-                    </label>
-                </div>
+                <!-- Removido o radio button Base Completa / Dados Filtrados -->
 
-                <div class="export-options">
+                <div class="export-options" style="margin-top: 20px;">
                     <button class="export-option-btn" id="btn-export-xlsx">
                         <i data-lucide="file-spreadsheet"></i>
                         <span>Planilha Excel (XLSX)</span>

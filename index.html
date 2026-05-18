@@ -44,6 +44,7 @@
                 </li>
                 <li><button class="nav-btn" data-target="screen-geo"><i data-lucide="map"></i> Geográfico</button></li>
                 <li><button class="nav-btn" data-target="screen-insights"><i data-lucide="trending-up"></i> Insights</button></li>
+                <li><button class="nav-btn" data-target="screen-indicadores"><i data-lucide="target"></i> Indicadores</button></li>
                 <li><button class="nav-btn" data-target="screen-data"><i data-lucide="database"></i> Relatórios</button></li>
             </ul>
             
@@ -202,6 +203,67 @@
                         </div>
                     </div>
 
+                </section>
+
+                <!-- Screen: Sistema de Indicadores -->
+                <section id="screen-indicadores" class="screen">
+                    <div class="glass-panel screen-header">
+                        <h2>Sistema de Indicadores de Sustentabilidade</h2>
+                        <p>Catálogo consolidado de indicadores monitorados, filtrável por Eixo Estratégico e Fonte de Origem.</p>
+                    </div>
+
+                    <!-- Dashboard Indicadores -->
+                    <div class="kpi-cards" style="margin-bottom: 20px;">
+                        <div class="kpi-card glass-panel" style="flex: 1; text-align: center;">
+                            <h4 id="kpi-total-indicadores">0</h4>
+                            <span>Total de Indicadores</span>
+                        </div>
+                        <div class="kpi-card glass-panel" style="flex: 1; text-align: center;">
+                            <h4 id="kpi-fontes-indicadores">0</h4>
+                            <span>Fontes Consolidadas</span>
+                        </div>
+                        <div class="chart-container glass-panel" style="flex: 2; padding: 10px;">
+                            <h3 style="margin-top: 0; font-size: 0.9rem; text-align: center;">Indicadores por Eixo</h3>
+                            <div class="canvas-wrapper" style="height: 120px;">
+                                <canvas id="chart-indicadores-eixos"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros Indicadores -->
+                    <div class="glass-panel" style="margin-bottom: 20px; padding: 15px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; color: var(--text-main);"><i data-lucide="pie-chart" style="width: 14px; height: 14px; vertical-align: middle;"></i> Filtrar por Eixo</label>
+                            <select id="filter-indicadores-eixo" class="glass-input" style="width: 100%; padding: 8px; border-radius: 6px;">
+                                <option value="">Todos os Eixos</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1; min-width: 200px;">
+                            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; color: var(--text-main);"><i data-lucide="book-open" style="width: 14px; height: 14px; vertical-align: middle;"></i> Filtrar por Fonte</label>
+                            <select id="filter-indicadores-fonte" class="glass-input" style="width: 100%; padding: 8px; border-radius: 6px;">
+                                <option value="">Todas as Fontes</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Tabela Indicadores -->
+                    <div class="table-container glass-panel">
+                        <table id="indicadores-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nome</th>
+                                    <th>Eixo</th>
+                                    <th>Fonte</th>
+                                    <th>Categoria</th>
+                                    <th style="width: 30%;">Requisitos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Preenchido via JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </section>
 
                 <!-- Screen 4: Base de Dados -->

@@ -8,9 +8,9 @@ Este documento fornece uma visão técnica detalhada da arquitetura, lógica e c
 O projeto segue uma arquitetura **Single Page Application (SPA)** clássica, processada inteiramente no lado do cliente (Client-side Rendering).
 
 ### Estrutura de Arquivos:
-- `index.html`: Estrutura semântica HTML5, links de bibliotecas e esqueleto do layout de 3 colunas.
+- `index.html`: Estrutura semântica HTML5, links de bibliotecas e esqueleto do layout. **Otimização recente**: A `top-bar` foi abolida para amplificar o *viewport* vertical dos gráficos, movendo controles corporativos para a `.right-sidebar`.
 - `styles.css`: Design System baseado em variáveis CSS (tokens), layout em Grid/Flexbox e sistema de temas.
-- `app.js`: O "cérebro" da aplicação. Gerencia estado, filtros, renderização de gráficos e interações.
+- `app.js`: O "cérebro" da aplicação. Gerencia estado, filtros, motor de relatórios PDF/XLSX e interações.
 - `parse.mjs`: Utilitário para sanitização e parsing de dados XLSX (caso necessário via terminal).
 - `Iniciativas_..._v03.xlsx`: A base de dados em formato Excel.
 
@@ -20,6 +20,8 @@ O projeto segue uma arquitetura **Single Page Application (SPA)** clássica, pro
 O dashboard utiliza um objeto literal `GlobalState` no `app.js` para centralizar a verdade da aplicação.
 
 ### Propriedades Principais:
+- `filters`: Retém os filtros ativos dos gráficos e mapa (cross-filtering).
+- `tableFilters` e `pagination`: Gerenciam de forma autônoma o estado do grid virtual DOM para não onerar o browser.
 - `customColors`: Um mapa dinâmico `Eixo -> Hexadecimal`, alimentado pela sidebar de legenda e sincronizado com as cores de tema.
 - `isCustomized`: Registra quais eixos tiveram cores alteradas manualmente para garantir persistência entre temas.
 
@@ -65,7 +67,17 @@ O fluxo de dados segue este pipeline:
 
 ---
 
-## 🛠️ 6. Guia de Manutenção
+## 🖨️ 6. Motor de Relatórios e Exportação
+A aba `screen-data` abriga a Tabela de Dados e a lógica de PDF/XLSX:
+1. **Performance**: A tabela deixou de estampar a supercoluna "Iniciativa Bruta", poupando ciclos cruciais de CPU no browser do cliente durante rolagens e loops de pesquisa.
+2. **Modal Inteligente**: O gerador de relatórios mapeia `GlobalState.filters` e `GlobalState.tableFilters` em tempo real.
+   - Se o array de filtros `active.length === 0`: Ele injeta nativamente o radio button para exportação da **Base Completa**.
+   - Se houver filtros presentes: A seleção muda para **Dados Filtrados**, garantindo WYSIWYG (O que você vê é o que você obtém).
+3. **Injeção em PDF**: O método `exportToPDF()` não só injeta estilos transpilados baseados em `window.print()` e `@page`, como recolhe a `string` de formatação com os metadados dos filtros ativos e chumba irreversivelmente no cabeçalho do documento, para fins de arquitetura de informação.
+
+---
+
+## 🛠️ 7. Guia de Manutenção
 
 ### Adicionar um Novo Gráfico:
 1.  Crie um `<canvas id="meu-novo-grafico">` no `index.html`.

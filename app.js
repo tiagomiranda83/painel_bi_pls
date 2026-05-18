@@ -18,6 +18,10 @@ var mapChart = null;
 var wordCloudChart = null;
 var geoJsonData = null;
 
+// Variáveis para Indicadores
+var indicadoresData = [];
+var indicadoresFilters = { Eixo: '', Fonte: '' };
+
 // ==========================================
 // STATE MANAGEMENT & CROSS FILTERING
 // ==========================================
@@ -287,6 +291,37 @@ async function loadData() {
         loadingStatus.textContent = "Processando Excel...";
         initLegend(); // Inicializa cores dinâmicas dos eixos
         processAndRender();
+
+        loadingStatus.textContent = "Processando Indicadores...";
+        try {
+            const indRes = await fetch('indicadores_normalizado.xlsx');
+            if (indRes.ok) {
+                const indBuffer = await indRes.arrayBuffer();
+                const indWb = XLSX.read(indBuffer, { type: 'array' });
+                
+                const sheetIndicadores = XLSX.utils.sheet_to_json(indWb.Sheets['Indicadores'] || indWb.Sheets[indWb.SheetNames[0]]);
+                const sheetFontes = indWb.Sheets['Fontes'] ? XLSX.utils.sheet_to_json(indWb.Sheets['Fontes']) : [];
+                const sheetEixos = indWb.Sheets['Eixos'] ? XLSX.utils.sheet_to_json(indWb.Sheets['Eixos']) : [];
+                
+                const mapFontes = {};
+                sheetFontes.forEach(f => mapFontes[f.fonte_id] = f.Fonte);
+                const mapEixos = {};
+                sheetEixos.forEach(e => mapEixos[e.eixo_id] = e.nome_eixo);
+                
+                indicadoresData = sheetIndicadores.map(ind => ({
+                    id: ind.indicador_id,
+                    nome: ind.nome_indicador || ind.Nome || '',
+                    eixo: mapEixos[ind.eixo_id] || ind.Eixo || 'N/A',
+                    fonte: mapFontes[ind.fonte_id] || ind.Fonte || 'N/A',
+                    requisitos: ind.requisitos || ind.Requisitos || '',
+                    categoria: ind.categoria || ind.Categoria || ''
+                }));
+                
+                initIndicadores();
+            }
+        } catch(e) {
+            console.warn("Aviso: Falha ao carregar indicadores_normalizado.xlsx", e);
+        }
 
         loadingStatus.textContent = "Dados Prontos!";
         
@@ -980,6 +1015,70 @@ function renderTable() {
 
     tableCount.textContent = `Mostrando ${start + 1} - ${Math.min(end, fullData.length)} de ${fullData.length} registros`;
     pageIndicator.textContent = `Página ${GlobalState.pagination.currentPage} de ${totalPages}`;
+}
+
+// ==========================================
+// INDICADORES LOGIC
+// ==========================================
+function initIndicadores() {
+    // Popular selects
+    const selectEixo = document.getElementById('filter-indicadores-eixo');
+    const selectFonte = document.getElementById('filter-indicadores-fonte');
+    
+    if(!selectEixo || !selectFonte) return;
+    
+    const eixos = [...new Set(indicadoresData.map(d => d.eixo))].sort();
+    const fontes = [...new Set(indicadoresData.map(d => d.fonte))].sort();
+    
+    eixos.forEach(e => selectEixo.add(new Option(e, e)));
+    fontes.forEach(f => selectFonte.add(new Option(f, f)));
+    
+    selectEixo.addEventListener('change', (e) => { indicadoresFilters.Eixo = e.target.value; renderIndicadores(); });
+    selectFonte.addEventListener('change', (e) => { indicadoresFilters.Fonte = e.target.value; renderIndicadores(); });
+    
+    renderIndicadores();
+}
+
+function renderIndicadores() {
+    let filtered = indicadoresData.filter(d => {
+        if (indicadoresFilters.Eixo && d.eixo !== indicadoresFilters.Eixo) return false;
+        if (indicadoresFilters.Fonte && d.fonte !== indicadoresFilters.Fonte) return false;
+        return true;
+    });
+    
+    // Atualizar KPIs
+    const kpiTotal = document.getElementById('kpi-total-indicadores');
+    if (kpiTotal) kpiTotal.textContent = filtered.length;
+    
+    const kpiFontes = document.getElementById('kpi-fontes-indicadores');
+    if (kpiFontes) kpiFontes.textContent = [...new Set(filtered.map(d => d.fonte))].length;
+    
+    // Atualizar Gráfico
+    const eixosCount = {};
+    filtered.forEach(d => eixosCount[d.eixo] = (eixosCount[d.eixo] || 0) + 1);
+    
+    // Ordenar os eixos pelo valor
+    const sortedEixos = Object.entries(eixosCount).sort((a,b) => b[1]-a[1]);
+    const labels = sortedEixos.map(x => x[0]);
+    const data = sortedEixos.map(x => x[1]);
+    const colors = labels.map(l => GlobalState.customColors[l] || getCssVar('--accent'));
+    
+    createOrUpdateChart('chart-indicadores-eixos', 'bar', labels, data, 'indicadoresEixos', 'Eixo', {
+        customDatasetColors: colors,
+        plugins: { datalabels: { color: '#ffffff' } },
+        scales: { x: { ticks: { color: getCssVar('--text-muted') } }, y: { ticks: { color: getCssVar('--text-muted') }, beginAtZero: true } }
+    });
+    
+    // Atualizar Tabela
+    const tbody = document.querySelector('#indicadores-table tbody');
+    if(tbody) {
+        tbody.innerHTML = '';
+        filtered.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${row.id || '-'}</td><td>${row.nome}</td><td>${row.eixo}</td><td>${row.fonte}</td><td>${row.categoria}</td><td>${row.requisitos}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
 }
 
 // ==========================================

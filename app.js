@@ -20,7 +20,8 @@ var geoJsonData = null;
 
 // Variáveis para Indicadores
 var indicadoresData = [];
-var indicadoresFilters = { Eixo: '', Fonte: '' };
+var indicadoresFilters = { Eixo: '', Fonte: '', Busca: '' };
+var indPagination = { currentPage: 1, pageSize: 20 };
 
 // ==========================================
 // STATE MANAGEMENT & CROSS FILTERING
@@ -1021,64 +1022,209 @@ function renderTable() {
 // INDICADORES LOGIC
 // ==========================================
 function initIndicadores() {
-    // Popular selects
     const selectEixo = document.getElementById('filter-indicadores-eixo');
     const selectFonte = document.getElementById('filter-indicadores-fonte');
-    
-    if(!selectEixo || !selectFonte) return;
-    
-    const eixos = [...new Set(indicadoresData.map(d => d.eixo))].sort();
-    const fontes = [...new Set(indicadoresData.map(d => d.fonte))].sort();
-    
-    eixos.forEach(e => selectEixo.add(new Option(e, e)));
-    fontes.forEach(f => selectFonte.add(new Option(f, f)));
-    
-    selectEixo.addEventListener('change', (e) => { indicadoresFilters.Eixo = e.target.value; renderIndicadores(); });
-    selectFonte.addEventListener('change', (e) => { indicadoresFilters.Fonte = e.target.value; renderIndicadores(); });
-    
+
+    if (!selectEixo || !selectFonte) return;
+
+    // Contar ocorrências por Eixo e Fonte
+    const eixoCount = {};
+    const fonteCount = {};
+    indicadoresData.forEach(d => {
+        eixoCount[d.eixo] = (eixoCount[d.eixo] || 0) + 1;
+        fonteCount[d.fonte] = (fonteCount[d.fonte] || 0) + 1;
+    });
+
+    // Limpar e popular selects com contagem
+    selectEixo.innerHTML = '<option value="">Todos os Eixos</option>';
+    Object.entries(eixoCount).sort((a, b) => a[0].localeCompare(b[0])).forEach(([e, n]) => {
+        selectEixo.add(new Option(`${e} (${n})`, e));
+    });
+
+    selectFonte.innerHTML = '<option value="">Todas as Fontes</option>';
+    Object.entries(fonteCount).sort((a, b) => a[0].localeCompare(b[0])).forEach(([f, n]) => {
+        selectFonte.add(new Option(`${f} (${n})`, f));
+    });
+
+    // Event listeners dos filtros
+    selectEixo.addEventListener('change', (e) => {
+        indicadoresFilters.Eixo = e.target.value;
+        indPagination.currentPage = 1;
+        renderIndicadores();
+    });
+    selectFonte.addEventListener('change', (e) => {
+        indicadoresFilters.Fonte = e.target.value;
+        indPagination.currentPage = 1;
+        renderIndicadores();
+    });
+
+    // Busca textual
+    const searchInput = document.getElementById('search-indicadores');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            indicadoresFilters.Busca = e.target.value.toLowerCase();
+            indPagination.currentPage = 1;
+            renderIndicadores();
+        });
+    }
+
+    // Botão limpar
+    const btnLimpar = document.getElementById('btn-limpar-indicadores');
+    if (btnLimpar) {
+        btnLimpar.addEventListener('click', () => {
+            indicadoresFilters = { Eixo: '', Fonte: '', Busca: '' };
+            selectEixo.value = '';
+            selectFonte.value = '';
+            if (searchInput) searchInput.value = '';
+            indPagination.currentPage = 1;
+            renderIndicadores();
+        });
+    }
+
+    // Paginação
+    const btnPrev = document.getElementById('btn-ind-prev');
+    const btnNext = document.getElementById('btn-ind-next');
+    if (btnPrev) btnPrev.addEventListener('click', () => {
+        if (indPagination.currentPage > 1) { indPagination.currentPage--; renderIndicadores(); }
+    });
+    if (btnNext) btnNext.addEventListener('click', () => {
+        const filtrado = getIndicadoresFiltrados();
+        const totalPages = Math.ceil(filtrado.length / indPagination.pageSize) || 1;
+        if (indPagination.currentPage < totalPages) { indPagination.currentPage++; renderIndicadores(); }
+    });
+
+    // Exportar
+    const btnExport = document.getElementById('btn-export-indicadores');
+    if (btnExport) {
+        btnExport.addEventListener('click', () => exportIndicadoresExcel());
+    }
+
     renderIndicadores();
 }
 
-function renderIndicadores() {
-    let filtered = indicadoresData.filter(d => {
+function getIndicadoresFiltrados() {
+    return indicadoresData.filter(d => {
         if (indicadoresFilters.Eixo && d.eixo !== indicadoresFilters.Eixo) return false;
         if (indicadoresFilters.Fonte && d.fonte !== indicadoresFilters.Fonte) return false;
+        if (indicadoresFilters.Busca) {
+            const termo = indicadoresFilters.Busca;
+            const match = (
+                (d.nome || '').toLowerCase().includes(termo) ||
+                (d.eixo || '').toLowerCase().includes(termo) ||
+                (d.fonte || '').toLowerCase().includes(termo) ||
+                (d.categoria || '').toLowerCase().includes(termo) ||
+                (d.requisitos || '').toLowerCase().includes(termo)
+            );
+            if (!match) return false;
+        }
         return true;
     });
-    
-    // Atualizar KPIs
+}
+
+function renderIndicadores() {
+    const filtered = getIndicadoresFiltrados();
+
+    // KPIs
     const kpiTotal = document.getElementById('kpi-total-indicadores');
     if (kpiTotal) kpiTotal.textContent = filtered.length;
-    
+
+    const kpiEixos = document.getElementById('kpi-eixos-indicadores');
+    if (kpiEixos) kpiEixos.textContent = [...new Set(filtered.map(d => d.eixo))].length;
+
     const kpiFontes = document.getElementById('kpi-fontes-indicadores');
     if (kpiFontes) kpiFontes.textContent = [...new Set(filtered.map(d => d.fonte))].length;
-    
-    // Atualizar Gráfico
+
+    // Gráfico por Eixo
     const eixosCount = {};
     filtered.forEach(d => eixosCount[d.eixo] = (eixosCount[d.eixo] || 0) + 1);
-    
-    // Ordenar os eixos pelo valor
-    const sortedEixos = Object.entries(eixosCount).sort((a,b) => b[1]-a[1]);
+    const sortedEixos = Object.entries(eixosCount).sort((a, b) => b[1] - a[1]);
     const labels = sortedEixos.map(x => x[0]);
     const data = sortedEixos.map(x => x[1]);
     const colors = labels.map(l => GlobalState.customColors[l] || getCssVar('--accent'));
-    
+
     createOrUpdateChart('chart-indicadores-eixos', 'bar', labels, data, 'indicadoresEixos', 'Eixo', {
         customDatasetColors: colors,
-        plugins: { datalabels: { color: '#ffffff' } },
-        scales: { x: { ticks: { color: getCssVar('--text-muted') } }, y: { ticks: { color: getCssVar('--text-muted') }, beginAtZero: true } }
+        plugins: { datalabels: { color: '#ffffff', anchor: 'center', align: 'center' } },
+        indexAxis: 'y',
+        scales: {
+            x: { ticks: { color: getCssVar('--text-muted') }, grid: { color: getCssVar('--border-glass') }, beginAtZero: true },
+            y: { ticks: { color: getCssVar('--text-muted') } }
+        }
     });
-    
-    // Atualizar Tabela
-    const tbody = document.querySelector('#indicadores-table tbody');
-    if(tbody) {
-        tbody.innerHTML = '';
-        filtered.forEach(row => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${row.id || '-'}</td><td>${row.nome}</td><td>${row.eixo}</td><td>${row.fonte}</td><td>${row.categoria}</td><td>${row.requisitos}</td>`;
-            tbody.appendChild(tr);
-        });
+
+    // Contagem
+    const countEl = document.getElementById('indicadores-count');
+    if (countEl) {
+        const total = filtered.length;
+        const totalPages = Math.ceil(total / indPagination.pageSize) || 1;
+        const start = (indPagination.currentPage - 1) * indPagination.pageSize + 1;
+        const end = Math.min(indPagination.currentPage * indPagination.pageSize, total);
+        countEl.textContent = total === 0 ? 'Nenhum indicador encontrado' : `Mostrando ${start}–${end} de ${total} indicadores`;
     }
+
+    // Paginação
+    const totalPages = Math.ceil(filtered.length / indPagination.pageSize) || 1;
+    if (indPagination.currentPage > totalPages) indPagination.currentPage = totalPages;
+    const pageIndicator = document.getElementById('ind-page-indicator');
+    if (pageIndicator) pageIndicator.textContent = `Página ${indPagination.currentPage} de ${totalPages}`;
+
+    const start = (indPagination.currentPage - 1) * indPagination.pageSize;
+    const pageData = filtered.slice(start, start + indPagination.pageSize);
+
+    // Tabela
+    const tbody = document.getElementById('indicadores-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (pageData.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5">
+                    <div class="indicadores-empty">
+                        <i data-lucide="search-x"></i>
+                        <p>Nenhum indicador encontrado para os filtros selecionados.</p>
+                    </div>
+                </td>
+            </tr>`;
+        lucide.createIcons();
+        return;
+    }
+
+    pageData.forEach(row => {
+        const cor = GlobalState.customColors[row.eixo] || getCssVar('--accent');
+        // Garantir cor hex para o badge
+        const corHex = colorToHex(cor);
+        const reqTruncado = (row.requisitos || '').length > 80
+            ? (row.requisitos || '').substring(0, 80) + '…'
+            : (row.requisitos || '-');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="text-align:center; font-size: 0.85rem; color: var(--text-muted); font-weight: 700;">${row.id || '-'}</td>
+            <td style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${row.nome || '-'}</td>
+            <td><span class="eixo-badge" style="background-color: ${corHex};" title="${row.eixo}">${row.eixo}</span></td>
+            <td style="font-size: 0.85rem; color: var(--text-muted);">${row.categoria || '-'}</td>
+            <td class="req-cell" title="${(row.requisitos || '').replace(/"/g, '&quot;')}">${reqTruncado}</td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+function exportIndicadoresExcel() {
+    const filtered = getIndicadoresFiltrados();
+    if (filtered.length === 0) return alert('Não há indicadores para exportar com os filtros atuais.');
+
+    const exportData = filtered.map(row => ({
+        'ID': row.id || '',
+        'Nome do Indicador': row.nome || '',
+        'Eixo Estratégico': row.eixo || '',
+        'Fonte': row.fonte || '',
+        'Categoria': row.categoria || '',
+        'Requisitos': row.requisitos || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Indicadores');
+    XLSX.writeFile(wb, 'BI_Indicadores_Sustentabilidade.xlsx');
 }
 
 // ==========================================
@@ -1224,6 +1370,7 @@ navBtns.forEach(btn => btn.addEventListener('click', () => {
         Object.values(charts).forEach(c => c.resize());
         if (mapChart) mapChart.resize();
         if (wordCloudChart) wordCloudChart.resize();
+        lucide.createIcons();
     }, 100);
 }));
 

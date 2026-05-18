@@ -208,42 +208,69 @@
                 <!-- Screen: Sistema de Indicadores -->
                 <section id="screen-indicadores" class="screen">
                     <div class="glass-panel screen-header">
-                        <h2>Sistema de Indicadores de Sustentabilidade</h2>
-                        <p>Catálogo consolidado de indicadores monitorados, filtrável por Eixo Estratégico e Fonte de Origem.</p>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+                            <div>
+                                <h2>Sistema de Indicadores de Sustentabilidade</h2>
+                                <p>Catálogo consolidado de indicadores monitorados, filtrável por Eixo Estratégico e Fonte de Origem.</p>
+                            </div>
+                            <button id="btn-export-indicadores" title="Exportar Indicadores" style="width: auto; padding: 8px 16px; border-radius: 8px; background: var(--accent); color: var(--bg-main); border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: opacity 0.2s; font-size:0.9rem; font-weight:600; white-space: nowrap;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                                <i data-lucide="file-spreadsheet"></i> Exportar Excel
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Dashboard Indicadores -->
-                    <div class="kpi-cards" style="margin-bottom: 20px;">
-                        <div class="kpi-card glass-panel" style="flex: 1; text-align: center;">
+                    <!-- KPIs + Gráfico -->
+                    <div class="indicadores-top-row">
+                        <div class="kpi-card glass-panel" style="text-align: center;">
                             <h4 id="kpi-total-indicadores">0</h4>
                             <span>Total de Indicadores</span>
                         </div>
-                        <div class="kpi-card glass-panel" style="flex: 1; text-align: center;">
+                        <div class="kpi-card glass-panel" style="text-align: center;">
+                            <h4 id="kpi-eixos-indicadores">0</h4>
+                            <span>Eixos Estratégicos</span>
+                        </div>
+                        <div class="kpi-card glass-panel" style="text-align: center;">
                             <h4 id="kpi-fontes-indicadores">0</h4>
                             <span>Fontes Consolidadas</span>
                         </div>
-                        <div class="chart-container glass-panel" style="flex: 2; padding: 10px;">
-                            <h3 style="margin-top: 0; font-size: 0.9rem; text-align: center;">Indicadores por Eixo</h3>
-                            <div class="canvas-wrapper" style="height: 120px;">
-                                <canvas id="chart-indicadores-eixos"></canvas>
-                            </div>
+                    </div>
+
+                    <!-- Gráfico de Eixos -->
+                    <div class="chart-container glass-panel" style="margin-bottom: 20px;">
+                        <h3>Distribuição por Eixo Estratégico</h3>
+                        <div class="canvas-wrapper" style="height: 280px;">
+                            <canvas id="chart-indicadores-eixos"></canvas>
                         </div>
                     </div>
 
-                    <!-- Filtros Indicadores -->
-                    <div class="glass-panel" style="margin-bottom: 20px; padding: 15px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                        <div style="flex: 1; min-width: 200px;">
-                            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; color: var(--text-main);"><i data-lucide="pie-chart" style="width: 14px; height: 14px; vertical-align: middle;"></i> Filtrar por Eixo</label>
-                            <select id="filter-indicadores-eixo" class="glass-input" style="width: 100%; padding: 8px; border-radius: 6px;">
+                    <!-- Filtros + Busca -->
+                    <div class="glass-panel indicadores-filtros">
+                        <div class="indicadores-filtro-item">
+                            <label><i data-lucide="pie-chart" style="width: 14px; height: 14px; vertical-align: middle;"></i> Filtrar por Eixo</label>
+                            <select id="filter-indicadores-eixo" class="glass-input" style="width: 100%;">
                                 <option value="">Todos os Eixos</option>
                             </select>
                         </div>
-                        <div style="flex: 1; min-width: 200px;">
-                            <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 5px; color: var(--text-main);"><i data-lucide="book-open" style="width: 14px; height: 14px; vertical-align: middle;"></i> Filtrar por Fonte</label>
-                            <select id="filter-indicadores-fonte" class="glass-input" style="width: 100%; padding: 8px; border-radius: 6px;">
+                        <div class="indicadores-filtro-item">
+                            <label><i data-lucide="book-open" style="width: 14px; height: 14px; vertical-align: middle;"></i> Filtrar por Fonte</label>
+                            <select id="filter-indicadores-fonte" class="glass-input" style="width: 100%;">
                                 <option value="">Todas as Fontes</option>
                             </select>
                         </div>
+                        <div class="indicadores-filtro-item" style="flex: 2;">
+                            <label><i data-lucide="search" style="width: 14px; height: 14px; vertical-align: middle;"></i> Busca Textual</label>
+                            <input type="text" id="search-indicadores" placeholder="Buscar em nome, eixo, fonte ou requisitos..." class="glass-input" style="width: 100%;">
+                        </div>
+                        <div class="indicadores-filtro-item" style="justify-content: flex-end; align-items: flex-end; flex: 0 0 auto;">
+                            <button id="btn-limpar-indicadores" class="nav-btn clear-btn">
+                                <i data-lucide="eraser"></i> Limpar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Contagem de resultados -->
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                        <span id="indicadores-count" style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Mostrando 0 indicadores</span>
                     </div>
 
                     <!-- Tabela Indicadores -->
@@ -251,18 +278,24 @@
                         <table id="indicadores-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Nome</th>
-                                    <th>Eixo</th>
-                                    <th>Fonte</th>
-                                    <th>Categoria</th>
-                                    <th style="width: 30%;">Requisitos</th>
+                                    <th style="width: 50px;">ID</th>
+                                    <th>Nome do Indicador</th>
+                                    <th style="width: 18%;">Eixo</th>
+                                    <th style="width: 14%;">Categoria</th>
+                                    <th style="width: 32%;">Requisitos</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="indicadores-tbody">
                                 <!-- Preenchido via JS -->
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Paginação Indicadores -->
+                    <div class="pagination-controls glass-panel" style="margin-top: 16px; display: flex; justify-content: center; gap: 8px;">
+                        <button id="btn-ind-prev" class="nav-btn" style="width:auto; padding: 6px 16px;"><i data-lucide="chevron-left"></i> Anterior</button>
+                        <span id="ind-page-indicator" style="display: flex; align-items: center; padding: 0 16px; font-weight: 600; color: var(--text-main);">Página 1</span>
+                        <button id="btn-ind-next" class="nav-btn" style="width:auto; padding: 6px 16px;">Próximo <i data-lucide="chevron-right"></i></button>
                     </div>
                 </section>
 

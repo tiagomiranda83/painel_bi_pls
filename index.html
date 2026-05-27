@@ -45,6 +45,7 @@
                 <li><button class="nav-btn" data-target="screen-geo"><i data-lucide="map"></i> Geográfico</button></li>
                 <li><button class="nav-btn" data-target="screen-insights"><i data-lucide="trending-up"></i> Insights</button></li>
                 <li><button class="nav-btn" data-target="screen-indicadores"><i data-lucide="target"></i> Indicadores</button></li>
+                <li><button class="nav-btn" data-target="screen-monte-pls"><i data-lucide="shopping-bag"></i> Monte seu PLS</button></li>
                 <li><button class="nav-btn" data-target="screen-data"><i data-lucide="database"></i> Relatórios</button></li>
             </ul>
             
@@ -282,7 +283,8 @@
                                     <th>Nome do Indicador</th>
                                     <th style="width: 18%;">Eixo</th>
                                     <th style="width: 14%;">Categoria</th>
-                                    <th style="width: 32%;">Requisitos</th>
+                                    <th style="width: 25%;">Requisitos</th>
+                                    <th style="width: 120px; text-align: center;">Ação</th>
                                 </tr>
                             </thead>
                             <tbody id="indicadores-tbody">
@@ -296,6 +298,117 @@
                         <button id="btn-ind-prev" class="nav-btn" style="width:auto; padding: 6px 16px;"><i data-lucide="chevron-left"></i> Anterior</button>
                         <span id="ind-page-indicator" style="display: flex; align-items: center; padding: 0 16px; font-weight: 600; color: var(--text-main);">Página 1</span>
                         <button id="btn-ind-next" class="nav-btn" style="width:auto; padding: 6px 16px;">Próximo <i data-lucide="chevron-right"></i></button>
+                    </div>
+                </section>
+
+                <!-- Screen: Monte seu PLS -->
+                <section id="screen-monte-pls" class="screen">
+                    <div class="glass-panel screen-header">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+                            <div>
+                                <h2>Monte seu Plano de Logística Sustentável (PLS)</h2>
+                                <p>Crie um plano estratégico personalizado estruturando eixos, ações e indicadores.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Steps Progress Indicator -->
+                    <div class="pls-steps-progress glass-panel" style="margin-bottom: 20px; padding: 15px 30px;">
+                        <div class="pls-steps-list">
+                            <div class="pls-step-item active" id="pls-step-indicator-1" onclick="setPlsStep(1)">
+                                <span class="step-num">1</span>
+                                <span class="step-text">Eixos Estratégicos</span>
+                            </div>
+                            <div class="pls-step-line" id="pls-step-line-1"></div>
+                            <div class="pls-step-item" id="pls-step-indicator-2" onclick="setPlsStep(2)">
+                                <span class="step-num">2</span>
+                                <span class="step-text">Ações & Formas de Trabalho</span>
+                            </div>
+                            <div class="pls-step-line" id="pls-step-line-2"></div>
+                            <div class="pls-step-item" id="pls-step-indicator-3" onclick="setPlsStep(3)">
+                                <span class="step-num">3</span>
+                                <span class="step-text">Vincular Indicadores</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Session Bar: Save / Load / Export -->
+                    <div class="pls-session-bar glass-panel" style="margin-bottom: 20px;">
+                        <div class="pls-session-btns">
+                            <input type="file" id="pls-session-upload" accept=".json" style="display: none;">
+                            <button id="btn-pls-load" class="btn-pls-session" title="Carregar planejamento salvo do computador">
+                                <i data-lucide="upload-cloud"></i> Carregar Sessão
+                            </button>
+                            <button id="btn-pls-save" class="btn-pls-session" title="Salvar planejamento atual no computador">
+                                <i data-lucide="download"></i> Salvar Sessão
+                            </button>
+                        </div>
+                        <div class="pls-session-btns">
+                            <button id="btn-pls-export-excel" class="btn-pls-session" title="Exportar plano formatado em Excel">
+                                <i data-lucide="file-spreadsheet"></i> Exportar XLSX
+                            </button>
+                            <button id="btn-pls-export-pdf" class="btn-pls-session btn-pls-session-primary" title="Imprimir/Gerar PDF estratégico">
+                                <i data-lucide="file-text"></i> Gerar Relatório PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- STEP 1: Seleção de Eixos -->
+                    <div id="pls-step-1-container" class="pls-step-content-pane">
+                        <div class="glass-panel">
+                            <h3>Etapa 1: Seleção de Eixos Estratégicos</h3>
+                            <p class="chart-desc" style="margin-bottom: 20px;">Escolha quais eixos temáticos farão parte do escopo estratégico do seu plano.</p>
+                            <div class="pls-eixos-grid" id="pls-step1-eixos-grid">
+                                <!-- Cards gerados dinamicamente via JS -->
+                            </div>
+                            <div style="display: flex; justify-content: flex-end; margin-top: 30px;">
+                                <button class="btn-pls-session btn-pls-session-primary" style="padding: 12px 24px; font-size: 1rem;" onclick="setPlsStep(2)">
+                                    Avançar para Ações <i data-lucide="arrow-right" style="width: 18px; margin-left: 6px;"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2: Definição de Ações -->
+                    <div id="pls-step-2-container" class="pls-step-content-pane" style="display: none;">
+                        <div class="glass-panel">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; margin-bottom: 20px;">
+                                <h3>Etapa 2: Ações & Formas de Trabalho</h3>
+                                <p class="chart-desc" style="margin-bottom: 0;">Descreva o que o órgão fará em cada eixo selecionado para atingir metas de sustentabilidade.</p>
+                            </div>
+                            <div id="pls-step2-eixos-actions-container" style="display: flex; flex-direction: column; gap: 24px;">
+                                <!-- Gerado dinamicamente via JS -->
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                                <button class="btn-pls-session" style="padding: 12px 24px; font-size: 1rem;" onclick="setPlsStep(1)">
+                                    <i data-lucide="arrow-left" style="width: 18px; margin-right: 6px;"></i> Voltar para Eixos
+                                </button>
+                                <button class="btn-pls-session btn-pls-session-primary" style="padding: 12px 24px; font-size: 1rem;" onclick="setPlsStep(3)">
+                                    Avançar para Indicadores <i data-lucide="arrow-right" style="width: 18px; margin-left: 6px;"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3: Vinculação de Indicadores -->
+                    <div id="pls-step-3-container" class="pls-step-content-pane" style="display: none;">
+                        <div class="glass-panel">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; margin-bottom: 20px;">
+                                <h3>Etapa 3: Vinculação de Indicadores</h3>
+                                <p class="chart-desc" style="margin-bottom: 0;">Para cada ação criada, associe indicadores que ajudem a auditar sua eficácia.</p>
+                            </div>
+                            <div id="pls-step3-actions-linkage-container" style="display: flex; flex-direction: column; gap: 24px;">
+                                <!-- Gerado dinamicamente via JS -->
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                                <button class="btn-pls-session" style="padding: 12px 24px; font-size: 1rem;" onclick="setPlsStep(2)">
+                                    <i data-lucide="arrow-left" style="width: 18px; margin-right: 6px;"></i> Voltar para Ações
+                                </button>
+                                <button class="btn-pls-session btn-pls-session-primary" style="padding: 12px 24px; font-size: 1rem;" onclick="exportPlsPDF()">
+                                    <i data-lucide="file-text" style="width: 18px; margin-right: 6px;"></i> Finalizar e Gerar PDF
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -352,44 +465,57 @@
 
         <!-- Legend & Global Color Control Sidebar (Right) -->
         <aside id="legend-sidebar" class="right-sidebar glass-panel">
-            <div class="sidebar-header">
-                <i data-lucide="palette" class="logo-icon"></i>
-                <h2>Personalizar</h2>
+            <!-- Pane 1: Personalizar (original) -->
+            <div id="personalizar-sidebar-content">
+                <div class="sidebar-header">
+                    <i data-lucide="palette" class="logo-icon"></i>
+                    <h2>Personalizar</h2>
+                </div>
+                <p class="legend-desc">Ajuste o tema, o foco da visão e neutralize as cores dos eixos estratégicos para todo o painel.</p>
+                
+                <div class="theme-control" style="margin-bottom: 20px; text-align: left; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 12px; text-align: center;">
+                        <i data-lucide="swatch-book" style="width: 14px; height: 14px; vertical-align: middle;"></i> Esquema de Cores (Tema)
+                    </label>
+                    <div class="theme-controls" style="display: flex; justify-content: center; align-items: center; gap: 6px;">
+                        <button class="theme-btn" data-theme-val="praia" title="Areia / Praia"><i data-lucide="sun-dim"></i></button>
+                        <button class="theme-btn" data-theme-val="claro" title="Claro"><i data-lucide="lightbulb"></i></button>
+                        <button class="theme-btn" data-theme-val="escuro" title="Escuro"><i data-lucide="moon"></i></button>
+                        <button class="theme-btn" data-theme-val="contraste" title="Alto Contraste border"><i data-lucide="contrast"></i></button>
+                    </div>
+                </div>
+                <div class="font-control" style="margin-bottom: 20px; text-align: left; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 12px; text-align: center;">
+                        <i data-lucide="zoom-in" style="width: 14px; height: 14px; vertical-align: middle;"></i> Tamanho do Painel (Zoom)
+                    </label>
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 15px;">
+                        <button id="btn-font-minus" style="width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--bg-glass); cursor: pointer; color: var(--text-main); box-shadow: var(--shadow-glass); display: flex; align-items: center; justify-content: center;"><i data-lucide="minus" style="width: 16px; height: 16px;"></i></button>
+                        <span id="font-size-val" style="font-weight: bold; font-size: 1rem; color: var(--text-main); min-width: 45px; text-align: center;">100%</span>
+                        <button id="btn-font-plus" style="width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--bg-glass); cursor: pointer; color: var(--text-main); box-shadow: var(--shadow-glass); display: flex; align-items: center; justify-content: center;"><i data-lucide="plus" style="width: 16px; height: 16px;"></i></button>
+                    </div>
+                </div>
+
+                <div id="legend-controls" class="legend-list">
+                    <!-- Populated by JS -->
+                </div>
+                <div class="legend-footer">
+                    <button id="btn-reset-colors" class="nav-btn">
+                        <i data-lucide="refresh-cw"></i> Resetar Cores
+                    </button>
+                </div>
             </div>
-            <p class="legend-desc">Ajuste o tema, o foco da visão e neutralize as cores dos eixos estratégicos para todo o painel.</p>
             
-            <div class="theme-control" style="margin-bottom: 20px; text-align: left; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
-                <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 12px; text-align: center;">
-                    <i data-lucide="swatch-book" style="width: 14px; height: 14px; vertical-align: middle;"></i> Esquema de Cores (Tema)
-                </label>
-                <div class="theme-controls" style="display: flex; justify-content: center; align-items: center; gap: 6px;">
-                    <button class="theme-btn" data-theme-val="praia" title="Areia / Praia"><i data-lucide="sun-dim"></i></button>
-                    <button class="theme-btn" data-theme-val="claro" title="Claro"><i data-lucide="lightbulb"></i></button>
-                    <button class="theme-btn" data-theme-val="escuro" title="Escuro"><i data-lucide="moon"></i></button>
-                    <button class="theme-btn" data-theme-val="contraste" title="Alto Contraste border"><i data-lucide="contrast"></i></button>
+            <!-- Pane 2: Resumo do PLS (novo) -->
+            <div id="pls-summary-sidebar-content" style="display: none; height: 100%; flex-direction: column;">
+                <div class="sidebar-header">
+                    <i data-lucide="scroll" class="logo-icon"></i>
+                    <h2>Resumo do PLS</h2>
                 </div>
-            </div>
-            <div class="font-control" style="margin-bottom: 20px; text-align: left; padding: 10px; background: rgba(0,0,0,0.05); border-radius: 8px;">
-                <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); display: block; margin-bottom: 12px; text-align: center;">
-                    <i data-lucide="zoom-in" style="width: 14px; height: 14px; vertical-align: middle;"></i> Tamanho do Painel (Zoom)
-                </label>
-                <div style="display: flex; justify-content: center; align-items: center; gap: 15px;">
-                    <button id="btn-font-minus" style="width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--bg-glass); cursor: pointer; color: var(--text-main); box-shadow: var(--shadow-glass); display: flex; align-items: center; justify-content: center;"><i data-lucide="minus" style="width: 16px; height: 16px;"></i></button>
-                    <span id="font-size-val" style="font-weight: bold; font-size: 1rem; color: var(--text-main); min-width: 45px; text-align: center;">100%</span>
-                    <button id="btn-font-plus" style="width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--bg-glass); cursor: pointer; color: var(--text-main); box-shadow: var(--shadow-glass); display: flex; align-items: center; justify-content: center;"><i data-lucide="plus" style="width: 16px; height: 16px;"></i></button>
+                <p class="legend-desc">Acompanhe em tempo real a estrutura do plano que você está montando.</p>
+                
+                <div style="flex: 1; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 16px;" id="pls-sidebar-summary-box">
+                    <!-- Preenchido via JS -->
                 </div>
-            </div>
-
-
-
-
-            <div id="legend-controls" class="legend-list">
-                <!-- Populated by JS -->
-            </div>
-            <div class="legend-footer">
-                <button id="btn-reset-colors" class="nav-btn">
-                    <i data-lucide="refresh-cw"></i> Resetar Cores
-                </button>
             </div>
         </aside>
     </div>

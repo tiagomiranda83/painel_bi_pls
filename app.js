@@ -1567,6 +1567,16 @@ window.handlePlsTaxonomyChange = function(eixo, selectEl) {
     }
 };
 
+function normalizeTaxonomyText(text) {
+    if (!text) return '';
+    return text.toString()
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
 function renderPlsStep2() {
     const container = document.getElementById('pls-step2-eixos-actions-container');
     if (!container) return;
@@ -1594,8 +1604,29 @@ function renderPlsStep2() {
         // Filtra ações criadas neste eixo
         const axisActions = GlobalState.plsWorkflow.actions.filter(a => a.eixo === eixo);
         
-        // Extrai iniciativas taxonômicas do Excel rawData para este Eixo
-        const taxonomyActions = [...new Set(rawData.filter(d => d['Eixo'] === eixo).map(d => d['Iniciativa consolidada']))].filter(Boolean).sort();
+        // Extrai iniciativas taxonômicas do Excel rawData para este Eixo consolidando duplicidades
+        const seenNormal = new Set();
+        const taxonomyActions = [];
+        
+        rawData.forEach(d => {
+            const rowEixo = d['Eixo'] ? d['Eixo'].toString().trim().toLowerCase() : '';
+            const targetEixo = eixo.toString().trim().toLowerCase();
+            
+            if (rowEixo === targetEixo) {
+                const rawText = d['Iniciativa consolidada'];
+                if (rawText) {
+                    const cleanText = rawText.toString().trim();
+                    const normText = normalizeTaxonomyText(cleanText);
+                    
+                    if (normText && !seenNormal.has(normText)) {
+                        seenNormal.add(normText);
+                        taxonomyActions.push(cleanText);
+                    }
+                }
+            }
+        });
+        
+        taxonomyActions.sort((a, b) => a.localeCompare(b, 'pt-BR'));
         
         let selectOptionsHTML = '<option value="">-- Selecione uma Iniciativa Padronizada --</option>';
         taxonomyActions.forEach(act => {
